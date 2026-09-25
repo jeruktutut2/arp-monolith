@@ -40,8 +40,8 @@ Dokumen ini adalah aturan wajib (*project rules*) untuk seluruh AI Agent saat be
 
 ---
 
-## 🎨 4. Frontend: SvelteKit 2 + Svelte 5 Runes
-- **Framework Utama**: **SvelteKit 2** dengan **Svelte 5 Runes** (`$state`, `$derived`, `$props`, `$effect`) dan Tailwind CSS.
+## 🎨 4. Frontend: SvelteKit 2 + Svelte 5 Runes + Bun
+- **Framework & Runtime**: **SvelteKit 2** dengan **Svelte 5 Runes** (`$state`, `$derived`, `$props`, `$effect`), **Tailwind CSS**, dan dikelola menggunakan **Bun** (`bun install`, `bun run dev`, `bun run build`).
 - **Pustaka Khusus Terintegrasi**:
   - `14_PRJ`: Frappe Gantt
   - `22_WFL`: XYFlow (`@xyflow/svelte`)

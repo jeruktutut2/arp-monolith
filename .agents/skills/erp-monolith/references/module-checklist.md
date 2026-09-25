@@ -54,10 +54,11 @@ Gunakan panduan ini saat membuat modul baru atau menambahkan fitur pada modul ya
 - [ ] Daftarkan event subscriber modul pada `eventBus`.
 - [ ] Pasang routes modul ke root router Echo v5 (`/api/v1/<modul>`).
 
-### Tahap 7: Frontend UI (SvelteKit 2 + Svelte 5 Runes)
+### Tahap 7: Frontend UI (SvelteKit 2 + Svelte 5 Runes + Bun)
 - [ ] Buka atau buat rute di `src/routes/(app)/<modul>/+page.svelte`.
 - [ ] Terapkan layout standar App Shell (`0_HDR`, `0_SDB`, `0_FTR`).
 - [ ] Terapkan reaktivitas berbasis Runes (`$state`, `$derived`, `$props`).
+- [ ] Kelola dependensi dan jalankan verifikasi via **Bun** (`bun install`, `bun run check`, `bun test`).
 - [ ] Hubungkan library pihak ketiga jika diperlukan:
   - Tabular data masif: **AG Grid Community / TanStack Table**
   - Timeline WBS: **Frappe Gantt** (`14_PRJ`)

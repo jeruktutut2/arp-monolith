@@ -90,7 +90,7 @@ Dokumen ini mendefinisikan aturan keras (*hard rules*) yang harus ditaati oleh s
 
 ---
 
-## 6. Standar Frontend SvelteKit 2 & Svelte 5
+## 6. Standar Frontend SvelteKit 2, Svelte 5 & Bun
 
 1. **Svelte 5 Runes**:
    - Gunakan `$state()` untuk variabel reaktif lokal.
@@ -100,3 +100,5 @@ Dokumen ini mendefinisikan aturan keras (*hard rules*) yang harus ditaati oleh s
 2. **Layout & Integrasi Libs**:
    - Gunakan layout bawaan SvelteKit `+layout.svelte` untuk menyematkan App Shell (`0_HDR`, `0_SDB`, `0_FTR`).
    - Hubungkan pustaka pihak ketiga secara modular melalui action Svelte `use:action` atau Svelte wrappers untuk meminimalisasi re-render tidak perlu.
+3. **Runtime & Package Manager (Bun)**:
+   - Gunakan **Bun** secara eksklusif untuk manajemen paket (`bun install`, `bun add`), eksekusi dev server (`bun run dev`), dan proses build (`bun run build`). Dilarang mencampur file lockfile seperti `package-lock.json` atau `pnpm-lock.yaml`.

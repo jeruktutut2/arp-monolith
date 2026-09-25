@@ -24,10 +24,11 @@ Referensi teknologi yang digunakan dalam proyek ERP Monolith.
 
 ---
 
-## 🎨 Frontend (SvelteKit 2 + Svelte 5)
+## 🎨 Frontend (SvelteKit 2 + Svelte 5 + Bun)
 
 | Fitur / Kebutuhan | Library Rekomendasi | Lisensi | Alasan & Modul Terkait |
 |:---|:---|:---:|:---|
+| **Runtime & Package Manager** | **Bun (v1.1+)** | MIT | Runtime JavaScript/TypeScript berkecepatan tinggi dan package manager instan (`bun install`, `bun run dev`, `bun test`). |
 | **Framework** | **SvelteKit 2 + Svelte 5** | MIT | Framework fullstack resmi dengan Reactivity berbasis Runes (`$state`, `$derived`, `$props`), performa tinggi, dan file-based routing. |
 | **Styling** | **Tailwind CSS** | MIT | Utility-first CSS dengan dukungan penuh dark/light mode class. |
 | **Interactive Gantt** | **Frappe Gantt** | MIT | Zero-dependency, ringan (~15KB), bawaan ERPNext untuk visualisasi timeline proyek (`14_PRJ`). |

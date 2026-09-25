@@ -44,7 +44,7 @@ Skill ini memandu AI agent dalam merancang, menulis, menguji, dan memelihara kod
 
 4. **Tech Stack Resmi**:
    - Backend: Golang 1.22+, Echo v5 Router, PostgreSQL 16+, PgBouncer, `golang-migrate`, `pgx/v5`, `sqlc`, `shopspring/decimal`.
-   - Frontend: SvelteKit 2 (Svelte 5 Runes), Tailwind CSS, Vite.
+   - Frontend: SvelteKit 2 (Svelte 5 Runes), Bun, Tailwind CSS, Vite.
    - Daftar pustaka UI lengkap: [Referensi Tech Stack](./references/tech-stack.md).
 
 ---
@@ -61,7 +61,7 @@ flowchart TD
     D --> E["5. Inbound Port Logic: Usecase<br>(Decimal math, validation, events)"]
     E --> F["6. Driving Adapter: Echo v5 Handlers<br>(Echo v5 routes, DTO, RBAC check)"]
     F --> G["7. Wiring di cmd/server/main.go"]
-    G --> H["8. SvelteKit 2 UI Component & Testing"]
+    G --> H["8. SvelteKit 2 UI Component & Testing (Bun)"]
 ```
 
 Gunakan checklist lengkap di [Checklist Implementasi Modul](./references/module-checklist.md) untuk verifikasi setiap langkah.
@@ -112,9 +112,11 @@ go test -v -race ./internal/...
 # 4. Generate query sqlc (jika ada perubahan file SQL)
 sqlc generate
 
-# 5. Type-check & lint Frontend (jika di folder frontend)
-npm run check
-npm run test
+# 5. Type-check, lint, & test Frontend via Bun (jika di folder frontend)
+bun install
+bun run check
+bun test
+bun run build
 ```
 
 ---

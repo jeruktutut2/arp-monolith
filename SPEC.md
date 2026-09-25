@@ -3,7 +3,7 @@
 > **Dokumen Spesifikasi Teknis & Fungsional Resmi**  
 > Proyek: `erp_monolith` | Repositori: `jeruktutut2/arp-monolith`  
 > Arsitektur: Go Modular Monolith (Hexagonal Architecture / Ports & Adapters)  
-> Full Stack: **Golang (Go 1.22+)**, **Echo v5**, **PostgreSQL 16+**, **PgBouncer**, **golang-migrate**, **SvelteKit 2 (Svelte 5 Runes)**  
+> Full Stack: **Golang (Go 1.22+)**, **Echo v5**, **PostgreSQL 16+**, **PgBouncer**, **golang-migrate**, **SvelteKit 2 (Svelte 5 Runes)**, **Bun**  
 > Dokumen Sumber: [erp_modules.md](file:///opt/dev/erp_monolith/design/erp_modules.md), [erp_backend_architecture.md](file:///opt/dev/erp_monolith/design/erp_backend_architecture.md), [erp_ui_thirdparty_libraries.md](file:///opt/dev/erp_monolith/design/erp_ui_thirdparty_libraries.md), [roadmap_implementasi.md](file:///opt/dev/erp_monolith/design/roadmap_implementasi.md)
 
 ---
@@ -16,7 +16,7 @@ Sistem ERP Monolith ini dirancang sebagai solusi manajemen sumber daya perusahaa
 1. **Integritas Finansial Penuh**: Pencatatan transaksi buku besar (*General Ledger*) otomatis melalui mekanisme *double-entry bookkeeping*, menjamin tidak ada saldo gantung atau perbedaan pembukuan antar-modul.
 2. **Kinerja Tinggi & Skalabilitas Koneksi**: Mengadopsi pola **Modular Monolith** dalam bahasa pemrograman **Golang**, dikompilasi menjadi satu berkas biner (*single deployable binary*) dengan HTTP framework performa tinggi **Echo v5**, serta pengelolaan ribuan koneksi konkuren melalui **PgBouncer** di depan basis data **PostgreSQL**.
 3. **Pemisahan Batas Domain & Hexagonal Architecture**: Menerapkan **Hexagonal Architecture (Ports & Adapters)** pada setiap modul (*bounded context*), mengisolasi aturan bisnis dari detail I/O, serta mencegah ketergantungan melingkar (*circular imports*) di Go melalui *consumer-defined interfaces* dan *event bus*.
-4. **Pengalaman Pengguna Modern Berbasis SvelteKit**: Antarmuka dibangun penuh menggunakan **SvelteKit 2** + **Svelte 5 (Runes)** dengan dukungan penuh *dark/light mode*, navigasi responsif 64px *mini-rail*, dan integrasi library khusus untuk kebutuhan industri (Gantt, Workflow Node Builder, Keyboard-First POS, Virtualized DataGrid, dan ECharts).
+4. **Pengalaman Pengguna Modern Berbasis SvelteKit & Bun**: Antarmuka dibangun penuh menggunakan **SvelteKit 2** + **Svelte 5 (Runes)** dan dikelola dengan runtime/package manager ultra-cepat **Bun**, dilengkapi dukungan penuh *dark/light mode*, navigasi responsif 64px *mini-rail*, dan integrasi library khusus untuk kebutuhan industri (Gantt, Workflow Node Builder, Keyboard-First POS, Virtualized DataGrid, dan ECharts).
 5. **Multi-Perusahaan & Multi-Cabang**: Isolasi data per `company_id` dan `branch_id` di setiap transaksi dan pembukuan.
 
 ---
@@ -249,16 +249,23 @@ Format respons kesalahan (*Error Response*):
 
 ---
 
-## 🎨 6. Spesifikasi Frontend (SvelteKit 2 + Svelte 5)
+## 🎨 6. Spesifikasi Frontend (SvelteKit 2 + Svelte 5 + Bun)
 
-Frontend dibangun menggunakan SvelteKit 2 dengan paradigma reaktivitas **Svelte 5 Runes** (`$state`, `$derived`, `$props`, `$effect`), dipadukan dengan Tailwind CSS dan Vite.
+Frontend dibangun menggunakan **SvelteKit 2** dengan paradigma reaktivitas **Svelte 5 Runes** (`$state`, `$derived`, `$props`, `$effect`), dipadukan dengan **Tailwind CSS**, dan dikelola dengan **Bun** sebagai JavaScript runtime & package manager utama.
 
-### 6.1 Arsitektur App Shell
+### 6.1 Runtime & Tooling (Bun)
+- **Package Manager & Runtime**: **Bun** (`bun install`, `bun run dev`, `bun run build`, `bun test`).
+- **Keunggulan untuk ERP**:
+  - Resolusi dependensi dan instalasi paket pihak ketiga (AG Grid, XYFlow, ECharts) secara instan via `bun install`.
+  - Eksekusi task build Vite dan test runner super-cepat tanpa lag startup Node.js.
+  - Kompatibilitas penuh dengan ekosistem NPM dan modul SvelteKit modern.
+
+### 6.2 Arsitektur App Shell
 - **Drawer & Rail Navigasi (`0_SDB`)**: Sidebar kiri dinamis yang mendukung mode normal (expand 260px) dan mode mini-rail (64px) dengan tooltip flyout otomatis.
 - **Top Header Bar (`0_HDR`)**: Sticky navigation bar dengan breadcrumbs dinamis, switcher multi-cabang, pencarian global lintas dokumen, dan user profile drawer.
 - **System Footer (`0_FTR`)**: Menampilkan latensi koneksi API realtime, environment badge (Dev/Staging/Prod), dan nomor versi rilis ERP.
 
-### 6.2 Integrasi Library Pihak Ketiga Khusus
+### 6.3 Integrasi Library Pihak Ketiga Khusus
 Berdasarkan dokumen teknis [erp_ui_thirdparty_libraries.md](file:///opt/dev/erp_monolith/design/erp_ui_thirdparty_libraries.md):
 
 1. **Interactive Gantt Chart (`14_PRJ`)**: Menggunakan **Frappe Gantt** (MIT, Zero Dependency) untuk visualisasi WBS, drag-and-drop jadwal tugas, dan *dependency lines*.
@@ -322,5 +329,5 @@ graph TD
 3. **Decimal Rounding Verification**:
    - Seluruh kalkulasi pajak, diskon bertingkat, dan amortisasi aset wajib diuji terhadap skenario pembulatan presisi desimal.
 4. **Single Binary Build**:
-   - Kompilasi frontend via Vite menghasilkan berkas statis di folder `dist/`.
+   - Kompilasi frontend via Bun & Vite (`bun run build`) menghasilkan berkas statis di folder `dist/` atau `build/client/`.
    - Asset tersebut di-embed ke dalam executable Go via `//go:embed dist/*`, menghasilkan 1 file biner yang siap di-deploy tanpa dependensi eksternal selain PostgreSQL.
