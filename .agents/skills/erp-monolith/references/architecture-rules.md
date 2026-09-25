@@ -4,15 +4,15 @@ Dokumen ini mendefinisikan aturan keras (*hard rules*) yang harus ditaati oleh s
 
 ---
 
-## 1. Batas Modul & Larangan Circular Import
+## 1. Hexagonal Architecture & Batas Modul
 
-1. **Package by Domain / Bounded Context**:
-   - Setiap modul bisnis berada di bawah `internal/modules/<modul_name>`.
-   - Modul memiliki isolasi internal sendiri:
-     - `domain/`: Entitas, Value Object, Domain Errors, dan Consumer-Defined Interfaces.
-     - `usecase/`: Aturan bisnis, kalkulasi finansial, orkestrasi transaksi.
-     - `repository/`: Akses database Postgres (sqlc / pgx).
-     - `delivery/http/`: Handler HTTP Chi, DTO, binding, validasi input.
+1. **Package by Domain / Bounded Context (Heksagon per Modul)**:
+   - Setiap modul bisnis berada di bawah `internal/modules/<nama_modul>`.
+   - Modul memiliki isolasi internal berbasis port dan adapter:
+     - `domain/`: Core Domain (Entitas, Value Object, Invarian, Domain Errors), Inbound Ports (Usecase Interfaces), dan Outbound Ports (Repository & Inter-module Contracts).
+     - `usecase/`: Implementasi Inbound Ports (Logika bisnis, kalkulasi finansial, orkestrasi transaksi).
+     - `repository/`: Driven Adapter untuk akses PostgreSQL via `sqlc` dan `pgx/v5` melalui PgBouncer.
+     - `delivery/http/`: Driving Adapter untuk HTTP REST API menggunakan **Echo v5** (`github.com/labstack/echo/v5`), DTO, binding, dan validasi input.
 
 2. **Dilarang Import Konkrit Lintas Modul**:
    - 🔴 **DILARANG**:
@@ -20,14 +20,14 @@ Dokumen ini mendefinisikan aturan keras (*hard rules*) yang harus ditaati oleh s
      // Di dalam package internal/modules/sales/usecase
      import "erp_monolith/internal/modules/inventory/usecase" // SALAH!
      ```
-   - 🟢 **BENAR (Consumer-Defined Interface)**:
+   - 🟢 **BENAR (Consumer-Defined Interface / Outbound Port)**:
      ```go
      // Di dalam package internal/modules/sales/domain/contracts.go
      type InventoryStockService interface {
          ReserveStock(ctx context.Context, itemID string, qty decimal.Decimal) error
      }
      ```
-     Implementasi interface diberikan oleh modul `inventory`, dan dihubungkan (*injected*) di `cmd/server/main.go`.
+     Implementasi interface diberikan oleh adapter modul `inventory`, dan dihubungkan (*injected*) di `cmd/server/main.go`.
 
 3. **Event Bus untuk Aksi Lanjutan (*Side-Effects*)**:
    - Jika suatu aksi tidak memerlukan konsistensi ACID instan (misal: posting jurnal buku besar setelah pesanan disetujui, pengiriman email notifikasi, atau pembuatan log audit), **wajib** menggunakan `EventBus`.
@@ -35,7 +35,19 @@ Dokumen ini mendefinisikan aturan keras (*hard rules*) yang harus ditaati oleh s
 
 ---
 
-## 2. Standar Presisi Finansial & Angka
+## 2. PostgreSQL & PgBouncer Connection Pooling
+
+1. **Topologi PgBouncer**:
+   - Aplikasi Go terhubung ke PgBouncer (:6432) menggunakan connection pool `pgxpool`.
+   - PgBouncer dikonfigurasi dengan `pool_mode = transaction`.
+2. **Kepatuhan Protokol Driver (`pgx/v5`)**:
+   - Karena transaksi dapat berganti koneksi backend pada mode transaksi PgBouncer, driver `pgxpool` harus menghindari prepared statement global yang mengikat session. Gunakan mode simple protocol (`QueryExecModeSimpleProtocol`) atau nameless prepared statements.
+3. **Migrasi DDL**:
+   - Eksekusi migrasi DDL database (`goose` / `golang-migrate`) dijalankan langsung ke port server PostgreSQL (bukan melalui pooler transaksi PgBouncer) untuk mendukung statement transaksional DDL yang kompleks.
+
+---
+
+## 3. Standar Presisi Finansial & Angka
 
 > [!CAUTION]
 > **Dilarang keras menggunakan tipe data `float32` atau `float64` untuk seluruh representasi nominal uang, diskon, kuantitas stok, dan tarif pajak.**
@@ -53,7 +65,7 @@ Dokumen ini mendefinisikan aturan keras (*hard rules*) yang harus ditaati oleh s
 
 ---
 
-## 3. Isolasi Data & Transaksi Database
+## 4. Isolasi Data & Transaksi Database
 
 1. **Kepemilikan Tabel Tunggal (*Single Table Ownership*)**:
    - Hanya modul pemilik yang boleh mengeksekusi query `INSERT`, `UPDATE`, `DELETE` pada tabel miliknya.
@@ -66,11 +78,11 @@ Dokumen ini mendefinisikan aturan keras (*hard rules*) yang harus ditaati oleh s
 
 ---
 
-## 4. Multi-Tenancy & Konteks Keamanan
+## 5. Multi-Tenancy & Konteks Keamanan
 
 1. Setiap entitas master dan transaksional wajib memuat:
    - `company_id UUID`: Identitas perusahaan/anak usaha.
    - `branch_id UUID`: Identitas cabang operasional.
 2. Setiap query baca dan tulis wajib menyertakan filter `WHERE company_id = $1`.
-3. Informasi aktor (siapa yang mengeksekusi) diekstrak dari `context.Context` melalui middleware platform:
+3. Informasi aktor (siapa yang mengeksekusi) diekstrak dari `echo.Context` melalui middleware platform:
    - `audit.GetActor(ctx) -> { UserID, CompanyID, BranchID, IP, UserAgent }`

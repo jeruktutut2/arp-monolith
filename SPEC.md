@@ -2,7 +2,8 @@
 
 > **Dokumen Spesifikasi Teknis & Fungsional Resmi**  
 > Proyek: `erp_monolith` | Repositori: `jeruktutut2/arp-monolith`  
-> Arsitektur: Go Modular Monolith (Clean Architecture) + SvelteKit 2 (Svelte 5 Runes)  
+> Arsitektur: Go Modular Monolith (Hexagonal Architecture / Ports & Adapters) + SvelteKit 2 (Svelte 5 Runes)  
+> Backend Stack: Golang, Echo v5, PostgreSQL 16+, PgBouncer  
 > Dokumen Sumber: [erp_modules.md](file:///opt/dev/erp_monolith/design/erp_modules.md), [erp_backend_architecture.md](file:///opt/dev/erp_monolith/design/erp_backend_architecture.md), [erp_ui_thirdparty_libraries.md](file:///opt/dev/erp_monolith/design/erp_ui_thirdparty_libraries.md), [roadmap_implementasi.md](file:///opt/dev/erp_monolith/design/roadmap_implementasi.md)
 
 ---
@@ -13,8 +14,8 @@ Sistem ERP Monolith ini dirancang sebagai solusi manajemen sumber daya perusahaa
 
 ### 1.1 Tujuan Utama
 1. **Integritas Finansial Penuh**: Pencatatan transaksi buku besar (*General Ledger*) otomatis melalui mekanisme *double-entry bookkeeping*, menjamin tidak ada saldo gantung atau perbedaan pembukuan antar-modul.
-2. **Kinerja Tinggi & Hemat Sumber Daya**: Mengadopsi pola **Modular Monolith** dalam bahasa pemrograman Go, dikompilasi menjadi satu berkas biner (*single deployable binary*) dengan latensi respons sub-100ms.
-3. **Pemisahan Batas Domain yang Ketat (*Bounded Contexts*)**: Mencegah ketergantungan melingkar (*circular imports*) di Go dengan memanfaatkan kontrak antarmuka (*consumer-defined interfaces*) dan *in-memory event bus*.
+2. **Kinerja Tinggi & Skalabilitas Koneksi**: Mengadopsi pola **Modular Monolith** dalam bahasa pemrograman **Golang**, dikompilasi menjadi satu berkas biner (*single deployable binary*) dengan HTTP framework performa tinggi **Echo v5**, serta pengelolaan ribuan koneksi konkuren melalui **PgBouncer** di depan basis data **PostgreSQL**.
+3. **Pemisahan Batas Domain & Hexagonal Architecture**: Menerapkan **Hexagonal Architecture (Ports & Adapters)** pada setiap modul (*bounded context*), mengisolasi aturan bisnis dari detail I/O, serta mencegah ketergantungan melingkar (*circular imports*) di Go melalui *consumer-defined interfaces* dan *event bus*.
 4. **Pengalaman Pengguna Modern**: Antarmuka berbasis SvelteKit 2 + Svelte 5 (Runes) dengan dukungan penuh *dark/light mode*, navigasi responsif 64px *mini-rail*, dan integrasi library khusus untuk kebutuhan industri (Gantt, Workflow Node Builder, Keyboard-First POS, Virtualized DataGrid, dan ECharts).
 5. **Multi-Perusahaan & Multi-Cabang**: Isolasi data per `company_id` dan `branch_id` di setiap transaksi dan pembukuan.
 
@@ -55,22 +56,64 @@ Sistem mengelompokkan 25 modul ke dalam 6 kategori bisnis utama serta 1 kelompok
 
 ---
 
-## 🏛️ 3. Spesifikasi Arsitektur Backend (Golang)
+## 🏛️ 3. Spesifikasi Arsitektur Backend (Golang & Hexagonal Architecture)
 
-Backend dibangun dengan pendekatan **Modular Monolith** berprinsip **Clean Architecture (Ports & Adapters)**.
+Backend dibangun dengan pendekatan **Modular Monolith** berprinsip **Hexagonal Architecture (Ports & Adapters)** pada setiap modul domain.
 
-### 3.1 Struktur Direktori Standar
+### 3.1 Pola Hexagonal Architecture per Modul
+Setiap modul bisnis merepresentasikan sebuah heksagon mandiri:
+
+```mermaid
+flowchart LR
+    subgraph Driving_Adapters ["Driving Adapters (Inbound)"]
+        EchoHTTP["Echo v5 REST Handlers<br>(delivery/http)"]
+        CLI["CLI / Background Runner"]
+    end
+
+    subgraph Hexagon_Core ["Hexagon Core: Bounded Context"]
+        InboundPort["Inbound Ports<br>(Usecase Interfaces)"]
+        DomainCore["Domain Model & Logic<br>(Entities, Value Objects)"]
+        OutboundPort["Outbound Ports<br>(Repo & Contract Interfaces)"]
+        
+        InboundPort --> DomainCore
+        DomainCore --> OutboundPort
+    end
+
+    subgraph Driven_Adapters ["Driven Adapters (Outbound)"]
+        PgRepo["PostgreSQL Repositories<br>(pgx/v5 + sqlc via PgBouncer)"]
+        EventPub["EventBus Publisher<br>(Watermill / Channel)"]
+        ModContract["Inter-Module Contract Adapters"]
+    end
+
+    EchoHTTP --> InboundPort
+    CLI --> InboundPort
+    OutboundPort --> PgRepo
+    OutboundPort --> EventPub
+    OutboundPort --> ModContract
+```
+
+1. **Core Domain (Pusat Heksagon)**:
+   - Terletak di `internal/modules/<nama_modul>/domain/`.
+   - Berisi entitas bisnis murni, kalkulasi keuangan (`decimal.Decimal`), aturan validasi invarian, dan *domain errors*. Bebas dari dependensi framework HTTP atau database.
+2. **Inbound Ports & Driving Adapters (Sisi Input)**:
+   - **Inbound Ports**: Interface Use Case yang diekspos domain untuk mengeksekusi proses bisnis (misal: `CreateSalesOrderUseCase`).
+   - **Driving Adapters**: Handler HTTP yang dibangun dengan **Echo v5** (`github.com/labstack/echo/v5`), bertugas membaca request JSON, validasi input, menerjemahkan konteks aktor/tenant, dan memanggil Inbound Port.
+3. **Outbound Ports & Driven Adapters (Sisi Output)**:
+   - **Outbound Ports**: Interface abstraksi persistensi (`OrderRepository`), publikasi event (`EventPublisher`), atau kebutuhan modul luar (`InventoryStockDeductor`).
+   - **Driven Adapters**: Implementasi konkrit seperti repository PostgreSQL (`pgx/v5` + `sqlc`), koneksi via **PgBouncer**, pengirim pesan event bus, dan modul integrasi eksternal.
+
+### 3.2 Struktur Direktori Standar per Modul
 ```text
 erp_monolith/
 ├── cmd/
 │   └── server/
-│       └── main.go                 # Entry point: Inisialisasi DB, EventBus, wiring inter-module, start HTTP
+│       └── main.go                 # Entry point: Inisialisasi PgBouncer/Postgres Pool, Echo v5 router, EventBus, wiring inter-module
 │
 ├── internal/
 │   ├── platform/                   # Komponen teknis infrastruktur (Non-Bisnis)
-│   │   ├── database/               # Pool pgx/v5, Transaction Manager, sqlc runner
+│   │   ├── database/               # Pool pgx/v5 ke PgBouncer, Transaction Manager, sqlc runner
 │   │   ├── eventbus/               # In-Memory Event Dispatcher / Watermill channel
-│   │   ├── middleware/             # TenantScope, AuthJWT, AuditActor, Recovery, CORS, RateLimit
+│   │   ├── middleware/             # Echo v5 Middleware: TenantScope, AuthJWT, AuditActor, Recovery, CORS, RateLimit
 │   │   ├── logger/                 # Structured logging (slog / zap)
 │   │   └── response/               # Standar response JSON, error mapper, pagination helper
 │   │
@@ -80,13 +123,13 @@ erp_monolith/
 │   │   ├── audit/                  # Context Actor (UserID, IP, UserAgent)
 │   │   └── apperrors/              # Kode error terpadu (NotFound, Conflict, Unauthorized, Validation)
 │   │
-│   └── modules/                    # BOUNDED CONTEXTS (Modul Bisnis)
+│   └── modules/                    # BOUNDED CONTEXTS (Modul Bisnis Heksagonal)
 │       ├── acc/                    # Modul Akuntansi & Buku Besar (ACC, GL, AP, AR)
-│       │   ├── domain/             # Entities, Value Objects, Domain Errors, Consumer Contracts
-│       │   ├── usecase/            # Business Logic & Orchestration
-│       │   ├── repository/         # Implementasi Akses Data SQL (sqlc / pgx)
+│       │   ├── domain/             # Core Domain (Entities, VO, Domain Errors) & Ports (Contracts & Repo Interfaces)
+│       │   ├── usecase/            # Inbound Port Implementations (Business Logic & Orchestration)
+│       │   ├── repository/         # Driven Adapter: Akses Data PostgreSQL (sqlc / pgx via PgBouncer)
 │       │   └── delivery/
-│       │       └── http/           # Chi REST Handlers, DTO Request/Response, Routes
+│       │       └── http/           # Driving Adapter: Echo v5 Handlers, DTO Request/Response, Routes
 │       ├── inv/                    # Modul Persediaan & Gudang (INV)
 │       ├── pur/                    # Modul Pembelian (PUR)
 │       ├── sal/                    # Modul Penjualan & Kasir (SAL, POS)
@@ -99,17 +142,17 @@ erp_monolith/
 └── go.sum
 ```
 
-### 3.2 Pola Komunikasi Antar-Modul
+### 3.3 Pola Komunikasi Antar-Modul
 1. **Komunikasi Sinkron (Validasi Transaksional)**:
    - Dilarang keras melakukan import konkrit antar-modul (`import "internal/modules/inventory"` di dalam package `sales` adalah **pelanggaran arsitektur**).
-   - Gunakan **Consumer-Defined Interface** pada package `domain` modul pemanggil:
+   - Gunakan **Consumer-Defined Interface (Outbound Port)** pada package `domain` modul pemanggil:
      ```go
      // internal/modules/sal/domain/contracts.go
      type InventoryService interface {
          ReserveStock(ctx context.Context, itemID string, qty decimal.Decimal) error
      }
      ```
-   - Modul `inv` mengimplementasikan fungsi tersebut. Penghubungan (*wiring*) dilakukan saat startup di `cmd/server/main.go`.
+   - Modul `inv` menyediakan adapter yang mengimplementasikan port tersebut. Penghubungan (*wiring*) dilakukan saat startup di `cmd/server/main.go`.
 
 2. **Komunikasi Asinkron (Side-Effects & Posting Jurnal)**:
    - Modul penerbit aksi mempublikasikan domain event ke `EventBus`:
@@ -122,20 +165,26 @@ erp_monolith/
      ```
    - Modul yang berkepentingan (`acc`, `aud`, `msg`) mendaftarkan subscriber tanpa memiliki ketergantungan langsung ke usecase pengirim.
 
-### 3.3 Penanganan Presisi Finansial
+### 3.4 Penanganan Presisi Finansial
 - **ATURAN MUTLAK**: Dilarang menggunakan tipe bawaan `float32` atau `float64` untuk seluruh representasi mata uang, harga pokok/jual, diskon, tarif pajak, dan kuantitas stok barang.
 - Wajib menggunakan library `github.com/shopspring/decimal`.
 - Di PostgreSQL, gunakan tipe data kolom `NUMERIC(18, 4)` atau `NUMERIC(15, 2)`.
 
 ---
 
-## 🗄️ 4. Spesifikasi Database & Persistensi
+## 🗄️ 4. Spesifikasi Database, Persistensi & Connection Pooling
 
-### 4.1 Standar Mesin Database
-- **Engine**: PostgreSQL 16+.
-- **Driver**: `github.com/jackc/pgx/v5` dengan koneksi connection pooling (`pgxpool`).
+### 4.1 Standar Basis Data & Pooler
+- **Database Engine**: PostgreSQL 16+.
+- **Connection Pooler Proxy**: **PgBouncer** (ditempatkan di antara aplikasi Golang dan server PostgreSQL).
+  - **Pool Mode**: `transaction` (`pool_mode = transaction`) untuk efisiensi koneksi tertinggi, memungkinkan ribuan transaksi konkuren berbagi kumpulan koneksi server PostgreSQL yang ramping.
+  - **Arsitektur Koneksi**:
+    ```text
+    [Echo v5 App Instances] --(pgxpool: pgx/v5)--> [PgBouncer Proxy :6432] --(TCP)--> [PostgreSQL Server :5432]
+    ```
+  - **Kesesuaian Driver `pgx/v5`**: Karena PgBouncer menggunakan *transaction pooling*, konfigurasi driver `pgxpool` diatur dengan mode query sederhana (*simple protocol*) atau *nameless prepared statements* (`default_query_exec_mode = QueryExecModeSimpleProtocol` atau `QueryExecModeExec`) guna mencegah konflik statement antar transaksi.
 - **Query Generator**: `sqlc` (`github.com/sqlc-dev/sqlc`) untuk menghasilkan kode Go yang type-safe dari berkas `.sql` murni.
-- **Migration Tool**: `goose` atau `golang-migrate`.
+- **Migration Tool**: `goose` atau `golang-migrate` (dijalankan langsung ke port direct PostgreSQL saat migrasi skema DDL).
 
 ### 4.2 Kepemilikan Tabel & Isolasi Skema
 Tiap modul memiliki tabel dengan prefiks unik atau Postgres Schema terpisah:

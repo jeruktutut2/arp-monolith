@@ -4,33 +4,42 @@ Dokumen ini adalah aturan wajib (*project rules*) untuk seluruh AI Agent saat be
 
 ---
 
-## 🏛️ 1. Arsitektur Inti: Modular Monolith
-- **Bahasa & Framework**: Go 1.22+ di backend (Clean Architecture per modul) dan SvelteKit 2 + Svelte 5 di frontend.
-- **Batas Domain**: Setiap modul bisnis terisolasi di dalam `internal/modules/<nama_modul>/`.
+## 🏛️ 1. Arsitektur Inti: Hexagonal Modular Monolith
+- **Bahasa & Backend Framework**: **Golang (Go 1.22+)** dengan **Echo v5** (`github.com/labstack/echo/v5`) sebagai routing & HTTP delivery adapter.
+- **Pola Arsitektur**: **Hexagonal Architecture (Ports & Adapters)** di setiap modul bisnis dalam satu kesatuan Modular Monolith.
+  - **Inbound Ports**: Interface Usecase/Application service.
+  - **Driving Adapters**: HTTP Handlers dengan Echo v5 (`delivery/http`).
+  - **Core Domain**: Model entitas bisnis, kalkulasi finansial (`decimal.Decimal`), dan aturan validasi invarian (`domain/`).
+  - **Outbound Ports**: Interface Repository, EventBus, dan Consumer-Defined Contracts (`domain/contracts.go`).
+  - **Driven Adapters**: Akses PostgreSQL via `pgx/v5` & `sqlc` melalui **PgBouncer** (`repository/`).
 - **Dilarang Keras Circular Dependency**:
   - Dilarang meng-import kode konkrit modul lain secara langsung.
-  - Untuk dependensi sinkron, gunakan **Consumer-Defined Interface** pada `domain/contracts.go`.
+  - Untuk dependensi sinkron, gunakan **Consumer-Defined Interface (Outbound Port)** pada `domain/contracts.go`.
   - Untuk integrasi asinkron dan efek samping (seperti posting jurnal otomatis atau notifikasi), gunakan `EventBus`.
 
 ---
 
-## 💰 2. Presisi Finansial: Wajib `decimal.Decimal`
+## 🗄️ 2. Database & Connection Pooling: PostgreSQL + PgBouncer
+- **Database Engine**: **PostgreSQL 16+**.
+- **Connection Pooler Proxy**: **PgBouncer** dengan mode `pool_mode = transaction`.
+  - Seluruh koneksi dari aplikasi Go (`pgxpool`) diarahkan ke port PgBouncer (:6432).
+  - Gunakan mode eksekusi query sederhana (`simple protocol` / tanpa prepared statement bentrok) agar kompatibel dengan pooling transaksi PgBouncer.
+- **Kepemilikan Tabel**: Setiap tabel memiliki prefiks domain modul (contoh: `acc_`, `inv_`, `sal_`, `pur_`, `sys_`).
+- **Dilarang Direct SQL JOIN Lintas Modul**: Gunakan data snapshot / denormalisasi saat transaksi dibuat atau panggil via interface port modul pemilik data.
+- **Kolom Audit Multi-Tenant Wajib**: `company_id`, `branch_id`, `created_at`, `created_by`, `updated_at`, `updated_by`.
+
+---
+
+## 💰 3. Presisi Finansial: Wajib `decimal.Decimal`
 - **Haram menggunakan `float32` atau `float64`** untuk segala nilai moneter, harga pokok, diskon, tarif pajak, dan kuantitas persediaan.
 - Selalu gunakan library `github.com/shopspring/decimal`.
 - Pada PostgreSQL, gunakan tipe kolom `NUMERIC(18, 4)` atau `NUMERIC(15, 2)`.
 
 ---
 
-## 🗄️ 3. Kepemilikan Database & Isolasi Tabel
-- Setiap tabel harus memiliki prefiks domain modul (contoh: `acc_`, `inv_`, `sal_`, `pur_`, `sys_`).
-- Dilarang membuat query SQL `JOIN` langsung ke tabel milik modul lain. Gunakan snapshot denormalisasi saat transaksi dibuat atau ambil lewat interface modul pemilik data.
-- Setiap tabel wajib menyertakan kolom audit multi-tenant: `company_id`, `branch_id`, `created_at`, `created_by`, `updated_at`, `updated_by`.
-
----
-
 ## 🎨 4. Frontend & Library UI Pihak Ketiga
-- Gunakan Svelte 5 Runes (`$state`, `$derived`, `$props`, `$effect`) dan Tailwind CSS.
-- Ikuti standar library khusus:
+- **Framework**: SvelteKit 2 + Svelte 5 Runes (`$state`, `$derived`, `$props`, `$effect`) dan Tailwind CSS.
+- **Pustaka Khusus Terintegrasi**:
   - `14_PRJ`: Frappe Gantt
   - `22_WFL`: XYFlow (`@xyflow/svelte`)
   - `12_POS`: `hotkeys-js` + `on-scan.js` + WebUSB/ESC-POS

@@ -4,16 +4,19 @@ Referensi teknologi yang digunakan dalam proyek ERP Monolith.
 
 ---
 
-## 🖥️ Backend (Golang)
+## 🖥️ Backend (Golang & Hexagonal Architecture)
 
 | Kategori | Paket / Library | Keterangan & Penggunaan |
 |:---|:---|:---|
-| **Language** | Go 1.22+ | Strongly typed, compiled, concurrency model tinggi. |
-| **HTTP Router** | `github.com/go-chi/chi/v5` | Ringan, 100% kompatibel dengan standard library `net/http`, mudah membuat sub-router per modul. |
-| **Database Driver** | `github.com/jackc/pgx/v5` | Driver PostgreSQL tercepat untuk Go dengan connection pooling `pgxpool`. |
+| **Language** | **Go 1.22+ (Golang)** | Strongly typed, compiled, concurrency model tinggi, hemat resource. |
+| **Architecture Pattern** | **Hexagonal Architecture** | Ports & Adapters per modul domain dalam satu kesatuan Modular Monolith. |
+| **HTTP Framework / Router** | **Echo v5** (`github.com/labstack/echo/v5`) | Framework HTTP berkecepatan tinggi, middleware extensible, sub-router grouping bersih untuk Driving Adapters. |
+| **Database Engine** | **PostgreSQL 16+** | Relational database ACID compliance penuh, dukungan native JSONB untuk workflow grafis, partitioning, dan indexing canggih. |
+| **Connection Pooler Proxy** | **PgBouncer** | Connection pooler di depan PostgreSQL dengan mode `pool_mode = transaction` untuk menangani ribuan koneksi konkuren aplikasi tanpa membebani RAM database. |
+| **Database Driver** | `github.com/jackc/pgx/v5` (`pgxpool`) | Driver PostgreSQL berperforma tinggi di Go. Dikonfigurasi dengan simple protocol mode agar sinkron dengan PgBouncer transaction pooling. |
 | **Query Generator** | `github.com/sqlc-dev/sqlc` | Mengompilasi query SQL mentah menjadi kode Go type-safe tanpa overhead runtime reflection ORM. |
-| **Database Migration**| `pressly/goose` / `golang-migrate` | Pengelolaan berkas DDL SQL bertahap. |
-| **Precision Math** | `github.com/shopspring/decimal` | Penanganan nilai mata uang dan kuantitas tanpa floating-point rounding error. |
+| **Database Migration**| `pressly/goose` / `golang-migrate` | Pengelolaan berkas DDL SQL bertahap (dijalankan langsung ke direct port Postgres). |
+| **Precision Math** | `github.com/shopspring/decimal` | Penanganan seluruh nilai mata uang, kuantitas stok, dan tarif pajak tanpa floating-point rounding error. |
 | **Event Bus** | `ThreeDotsLabs/watermill` / In-Memory Channel | Pengiriman pesan asinkron antar-modul (*decoupled domain events*). |
 | **Job Queue** | `hibiken/asynq` / `riverqueue/river` | Background workers (email blast, sinkronisasi bulk, rekonsiliasi akhir bulan). |
 | **Structured Log** | `log/slog` (Standard) atau `go.uber.org/zap` | Logging JSON dengan contextual trace_id dan tenant_id. |
