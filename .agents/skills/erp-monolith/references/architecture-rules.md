@@ -42,8 +42,9 @@ Dokumen ini mendefinisikan aturan keras (*hard rules*) yang harus ditaati oleh s
    - PgBouncer dikonfigurasi dengan `pool_mode = transaction`.
 2. **Kepatuhan Protokol Driver (`pgx/v5`)**:
    - Karena transaksi dapat berganti koneksi backend pada mode transaksi PgBouncer, driver `pgxpool` harus menghindari prepared statement global yang mengikat session. Gunakan mode simple protocol (`QueryExecModeSimpleProtocol`) atau nameless prepared statements.
-3. **Migrasi DDL**:
-   - Eksekusi migrasi DDL database (`goose` / `golang-migrate`) dijalankan langsung ke port server PostgreSQL (bukan melalui pooler transaksi PgBouncer) untuk mendukung statement transaksional DDL yang kompleks.
+3. **Migrasi Skema dengan `golang-migrate`**:
+   - Eksekusi migrasi DDL database wajib menggunakan **`golang-migrate`** (`github.com/golang-migrate/migrate/v4`) dengan pasangan berkas `.up.sql` dan `.down.sql`.
+   - Perintah migrasi dijalankan langsung ke port server PostgreSQL (:5432), bukan melalui pooler transaksi PgBouncer, untuk mendukung statement DDL transaksional secara penuh.
 
 ---
 
@@ -86,3 +87,16 @@ Dokumen ini mendefinisikan aturan keras (*hard rules*) yang harus ditaati oleh s
 2. Setiap query baca dan tulis wajib menyertakan filter `WHERE company_id = $1`.
 3. Informasi aktor (siapa yang mengeksekusi) diekstrak dari `echo.Context` melalui middleware platform:
    - `audit.GetActor(ctx) -> { UserID, CompanyID, BranchID, IP, UserAgent }`
+
+---
+
+## 6. Standar Frontend SvelteKit 2 & Svelte 5
+
+1. **Svelte 5 Runes**:
+   - Gunakan `$state()` untuk variabel reaktif lokal.
+   - Gunakan `$derived()` untuk kalkulasi turunan (computed state).
+   - Gunakan `$props()` untuk deklarasi props komponen.
+   - Gunakan `$effect()` untuk efek samping berbasis siklus hidup DOM.
+2. **Layout & Integrasi Libs**:
+   - Gunakan layout bawaan SvelteKit `+layout.svelte` untuk menyematkan App Shell (`0_HDR`, `0_SDB`, `0_FTR`).
+   - Hubungkan pustaka pihak ketiga secara modular melalui action Svelte `use:action` atau Svelte wrappers untuk meminimalisasi re-render tidak perlu.

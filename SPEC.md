@@ -2,8 +2,8 @@
 
 > **Dokumen Spesifikasi Teknis & Fungsional Resmi**  
 > Proyek: `erp_monolith` | Repositori: `jeruktutut2/arp-monolith`  
-> Arsitektur: Go Modular Monolith (Hexagonal Architecture / Ports & Adapters) + SvelteKit 2 (Svelte 5 Runes)  
-> Backend Stack: Golang, Echo v5, PostgreSQL 16+, PgBouncer  
+> Arsitektur: Go Modular Monolith (Hexagonal Architecture / Ports & Adapters)  
+> Full Stack: **Golang (Go 1.22+)**, **Echo v5**, **PostgreSQL 16+**, **PgBouncer**, **golang-migrate**, **SvelteKit 2 (Svelte 5 Runes)**  
 > Dokumen Sumber: [erp_modules.md](file:///opt/dev/erp_monolith/design/erp_modules.md), [erp_backend_architecture.md](file:///opt/dev/erp_monolith/design/erp_backend_architecture.md), [erp_ui_thirdparty_libraries.md](file:///opt/dev/erp_monolith/design/erp_ui_thirdparty_libraries.md), [roadmap_implementasi.md](file:///opt/dev/erp_monolith/design/roadmap_implementasi.md)
 
 ---
@@ -16,7 +16,7 @@ Sistem ERP Monolith ini dirancang sebagai solusi manajemen sumber daya perusahaa
 1. **Integritas Finansial Penuh**: Pencatatan transaksi buku besar (*General Ledger*) otomatis melalui mekanisme *double-entry bookkeeping*, menjamin tidak ada saldo gantung atau perbedaan pembukuan antar-modul.
 2. **Kinerja Tinggi & Skalabilitas Koneksi**: Mengadopsi pola **Modular Monolith** dalam bahasa pemrograman **Golang**, dikompilasi menjadi satu berkas biner (*single deployable binary*) dengan HTTP framework performa tinggi **Echo v5**, serta pengelolaan ribuan koneksi konkuren melalui **PgBouncer** di depan basis data **PostgreSQL**.
 3. **Pemisahan Batas Domain & Hexagonal Architecture**: Menerapkan **Hexagonal Architecture (Ports & Adapters)** pada setiap modul (*bounded context*), mengisolasi aturan bisnis dari detail I/O, serta mencegah ketergantungan melingkar (*circular imports*) di Go melalui *consumer-defined interfaces* dan *event bus*.
-4. **Pengalaman Pengguna Modern**: Antarmuka berbasis SvelteKit 2 + Svelte 5 (Runes) dengan dukungan penuh *dark/light mode*, navigasi responsif 64px *mini-rail*, dan integrasi library khusus untuk kebutuhan industri (Gantt, Workflow Node Builder, Keyboard-First POS, Virtualized DataGrid, dan ECharts).
+4. **Pengalaman Pengguna Modern Berbasis SvelteKit**: Antarmuka dibangun penuh menggunakan **SvelteKit 2** + **Svelte 5 (Runes)** dengan dukungan penuh *dark/light mode*, navigasi responsif 64px *mini-rail*, dan integrasi library khusus untuk kebutuhan industri (Gantt, Workflow Node Builder, Keyboard-First POS, Virtualized DataGrid, dan ECharts).
 5. **Multi-Perusahaan & Multi-Cabang**: Isolasi data per `company_id` dan `branch_id` di setiap transaksi dan pembukuan.
 
 ---
@@ -184,7 +184,7 @@ erp_monolith/
     ```
   - **Kesesuaian Driver `pgx/v5`**: Karena PgBouncer menggunakan *transaction pooling*, konfigurasi driver `pgxpool` diatur dengan mode query sederhana (*simple protocol*) atau *nameless prepared statements* (`default_query_exec_mode = QueryExecModeSimpleProtocol` atau `QueryExecModeExec`) guna mencegah konflik statement antar transaksi.
 - **Query Generator**: `sqlc` (`github.com/sqlc-dev/sqlc`) untuk menghasilkan kode Go yang type-safe dari berkas `.sql` murni.
-- **Migration Tool**: `goose` atau `golang-migrate` (dijalankan langsung ke port direct PostgreSQL saat migrasi skema DDL).
+- **Migration Tool**: **`golang-migrate`** (`github.com/golang-migrate/migrate/v4`) dengan skema berkas migrasi berpasangan `migrations/<seq>_<name>.up.sql` dan `migrations/<seq>_<name>.down.sql`. Eksekusi migrasi skema DDL wajib diarahkan langsung ke port direct PostgreSQL (:5432) guna mendukung transaksi DDL menyeluruh.
 
 ### 4.2 Kepemilikan Tabel & Isolasi Skema
 Tiap modul memiliki tabel dengan prefiks unik atau Postgres Schema terpisah:

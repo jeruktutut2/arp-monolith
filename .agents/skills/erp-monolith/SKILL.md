@@ -28,9 +28,10 @@ Skill ini memandu AI agent dalam merancang, menulis, menguji, dan memelihara kod
    - Gunakan **Event Bus** untuk interaksi asinkron / efek samping (contoh: posting jurnal dari invoice).
    - Baca panduan lengkap di: [Aturan Arsitektur](./references/architecture-rules.md).
 
-2. **Basis Data PostgreSQL & PgBouncer Connection Pooling**:
+2. **Basis Data PostgreSQL, PgBouncer & Migrasi golang-migrate**:
    - Database Engine: **PostgreSQL 16+**.
    - Pooler Proxy: **PgBouncer** dengan mode `pool_mode = transaction`.
+   - Tool Migrasi Resmi: **golang-migrate** (`github.com/golang-migrate/migrate/v4`) dengan skema berkas `migrations/<seq>_<name>.up.sql` dan `migrations/<seq>_<name>.down.sql`.
    - Konfigurasi `pgx/v5`: Menggunakan simple protocol (`QueryExecModeSimpleProtocol`) untuk menjamin kompatibilitas transaksi pada PgBouncer.
    - Setiap tabel wajib menggunakan prefiks modul (`acc_`, `inv_`, `sal_`, `pur_`, `sys_`, dll.).
    - Tidak boleh ada query SQL JOIN lintas domain modul privat. Gunakan snapshot denormalisasi saat transaksi dibuat.
@@ -42,8 +43,8 @@ Skill ini memandu AI agent dalam merancang, menulis, menguji, dan memelihara kod
    - Kolom database menggunakan `NUMERIC(18, 4)` atau `NUMERIC(15, 2)`.
 
 4. **Tech Stack Resmi**:
-   - Backend: Golang 1.22+, Echo v5 Router, PostgreSQL 16+, PgBouncer, `pgx/v5`, `sqlc`, `shopspring/decimal`.
-   - Frontend: SvelteKit 2, Svelte 5 (Runes), Tailwind CSS, Vite.
+   - Backend: Golang 1.22+, Echo v5 Router, PostgreSQL 16+, PgBouncer, `golang-migrate`, `pgx/v5`, `sqlc`, `shopspring/decimal`.
+   - Frontend: SvelteKit 2 (Svelte 5 Runes), Tailwind CSS, Vite.
    - Daftar pustaka UI lengkap: [Referensi Tech Stack](./references/tech-stack.md).
 
 ---
@@ -54,13 +55,13 @@ Saat diminta membuat fitur baru atau mengimplementasikan modul dari desain (`des
 
 ```mermaid
 flowchart TD
-    A["1. Analisis Spesifikasi UI & Domain<br>(design/ui/<modul> & SPEC.md)"] --> B["2. Buat DDL Migrasi PostgreSQL<br>(migrations/xxx_<modul>.sql)"]
+    A["1. Analisis Spesifikasi UI & Domain<br>(design/ui/<modul> & SPEC.md)"] --> B["2. Buat DDL Migrasi golang-migrate<br>(migrations/xxx_<modul>.up.sql & .down.sql)"]
     B --> C["3. Implementasikan Hexagon Domain & Ports<br>(Entities, Inbound & Outbound Ports)"]
     C --> D["4. Driven Adapter: SQL & Repository<br>(sqlc / pgx via PgBouncer)"]
     D --> E["5. Inbound Port Logic: Usecase<br>(Decimal math, validation, events)"]
     E --> F["6. Driving Adapter: Echo v5 Handlers<br>(Echo v5 routes, DTO, RBAC check)"]
     F --> G["7. Wiring di cmd/server/main.go"]
-    G --> H["8. SvelteKit UI Component & Testing"]
+    G --> H["8. SvelteKit 2 UI Component & Testing"]
 ```
 
 Gunakan checklist lengkap di [Checklist Implementasi Modul](./references/module-checklist.md) untuk verifikasi setiap langkah.

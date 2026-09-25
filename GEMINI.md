@@ -19,11 +19,14 @@ Dokumen ini adalah aturan wajib (*project rules*) untuk seluruh AI Agent saat be
 
 ---
 
-## 🗄️ 2. Database & Connection Pooling: PostgreSQL + PgBouncer
+## 🗄️ 2. Database, PgBouncer & Migrasi: PostgreSQL + golang-migrate
 - **Database Engine**: **PostgreSQL 16+**.
 - **Connection Pooler Proxy**: **PgBouncer** dengan mode `pool_mode = transaction`.
   - Seluruh koneksi dari aplikasi Go (`pgxpool`) diarahkan ke port PgBouncer (:6432).
   - Gunakan mode eksekusi query sederhana (`simple protocol` / tanpa prepared statement bentrok) agar kompatibel dengan pooling transaksi PgBouncer.
+- **Migration Tool Resmi**: **golang-migrate** (`github.com/golang-migrate/migrate/v4`).
+  - Berkas migrasi disimpan berpasangan di folder `migrations/` dengan format: `<seq>_<nama_modul>_<deskripsi>.up.sql` dan `<seq>_<nama_modul>_<deskripsi>.down.sql`.
+  - DDL migrasi skema dijalankan langsung ke port direct PostgreSQL (:5432).
 - **Kepemilikan Tabel**: Setiap tabel memiliki prefiks domain modul (contoh: `acc_`, `inv_`, `sal_`, `pur_`, `sys_`).
 - **Dilarang Direct SQL JOIN Lintas Modul**: Gunakan data snapshot / denormalisasi saat transaksi dibuat atau panggil via interface port modul pemilik data.
 - **Kolom Audit Multi-Tenant Wajib**: `company_id`, `branch_id`, `created_at`, `created_by`, `updated_at`, `updated_by`.
@@ -37,8 +40,8 @@ Dokumen ini adalah aturan wajib (*project rules*) untuk seluruh AI Agent saat be
 
 ---
 
-## 🎨 4. Frontend & Library UI Pihak Ketiga
-- **Framework**: SvelteKit 2 + Svelte 5 Runes (`$state`, `$derived`, `$props`, `$effect`) dan Tailwind CSS.
+## 🎨 4. Frontend: SvelteKit 2 + Svelte 5 Runes
+- **Framework Utama**: **SvelteKit 2** dengan **Svelte 5 Runes** (`$state`, `$derived`, `$props`, `$effect`) dan Tailwind CSS.
 - **Pustaka Khusus Terintegrasi**:
   - `14_PRJ`: Frappe Gantt
   - `22_WFL`: XYFlow (`@xyflow/svelte`)

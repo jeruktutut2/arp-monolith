@@ -6,9 +6,9 @@ Gunakan panduan ini saat membuat modul baru atau menambahkan fitur pada modul ya
 
 ## 🛠️ Langkah-Langkah Pengerjaan Modul Baru (Hexagonal Pattern)
 
-### Tahap 1: Desain Basis Data & Migrasi PostgreSQL
-- [ ] Buat berkas migrasi baru di folder `migrations/` dengan penomoran berurutan:
-  - Contoh: `migrations/010_sal_sales_orders.sql`
+### Tahap 1: Desain Basis Data & Migrasi PostgreSQL (golang-migrate)
+- [ ] Buat berkas migrasi baru berpasangan di folder `migrations/` dengan penomoran berurutan:
+  - Contoh: `migrations/000010_sal_sales_orders.up.sql` dan `migrations/000010_sal_sales_orders.down.sql`
 - [ ] Tentukan nama tabel dengan prefiks modul (contoh: `sal_orders`, `sal_order_items`).
 - [ ] Tambahkan kolom audit wajib:
   - `company_id UUID NOT NULL`
@@ -54,9 +54,10 @@ Gunakan panduan ini saat membuat modul baru atau menambahkan fitur pada modul ya
 - [ ] Daftarkan event subscriber modul pada `eventBus`.
 - [ ] Pasang routes modul ke root router Echo v5 (`/api/v1/<modul>`).
 
-### Tahap 7: Frontend UI (SvelteKit)
-- [ ] Buka atau buat rute di `src/routes/(app)/<modul>/`.
+### Tahap 7: Frontend UI (SvelteKit 2 + Svelte 5 Runes)
+- [ ] Buka atau buat rute di `src/routes/(app)/<modul>/+page.svelte`.
 - [ ] Terapkan layout standar App Shell (`0_HDR`, `0_SDB`, `0_FTR`).
+- [ ] Terapkan reaktivitas berbasis Runes (`$state`, `$derived`, `$props`).
 - [ ] Hubungkan library pihak ketiga jika diperlukan:
   - Tabular data masif: **AG Grid Community / TanStack Table**
   - Timeline WBS: **Frappe Gantt** (`14_PRJ`)

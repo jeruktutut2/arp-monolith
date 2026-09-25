@@ -15,7 +15,7 @@ Referensi teknologi yang digunakan dalam proyek ERP Monolith.
 | **Connection Pooler Proxy** | **PgBouncer** | Connection pooler di depan PostgreSQL dengan mode `pool_mode = transaction` untuk menangani ribuan koneksi konkuren aplikasi tanpa membebani RAM database. |
 | **Database Driver** | `github.com/jackc/pgx/v5` (`pgxpool`) | Driver PostgreSQL berperforma tinggi di Go. Dikonfigurasi dengan simple protocol mode agar sinkron dengan PgBouncer transaction pooling. |
 | **Query Generator** | `github.com/sqlc-dev/sqlc` | Mengompilasi query SQL mentah menjadi kode Go type-safe tanpa overhead runtime reflection ORM. |
-| **Database Migration**| `pressly/goose` / `golang-migrate` | Pengelolaan berkas DDL SQL bertahap (dijalankan langsung ke direct port Postgres). |
+| **Database Migration**| **`golang-migrate`** (`github.com/golang-migrate/migrate/v4`) | Pengelolaan berkas DDL SQL bertahap berpasangan (`.up.sql` dan `.down.sql`), dijalankan langsung ke direct port Postgres (:5432). |
 | **Precision Math** | `github.com/shopspring/decimal` | Penanganan seluruh nilai mata uang, kuantitas stok, dan tarif pajak tanpa floating-point rounding error. |
 | **Event Bus** | `ThreeDotsLabs/watermill` / In-Memory Channel | Pengiriman pesan asinkron antar-modul (*decoupled domain events*). |
 | **Job Queue** | `hibiken/asynq` / `riverqueue/river` | Background workers (email blast, sinkronisasi bulk, rekonsiliasi akhir bulan). |
@@ -28,7 +28,7 @@ Referensi teknologi yang digunakan dalam proyek ERP Monolith.
 
 | Fitur / Kebutuhan | Library Rekomendasi | Lisensi | Alasan & Modul Terkait |
 |:---|:---|:---:|:---|
-| **Framework** | **SvelteKit 2 + Svelte 5** | MIT | Reactivity berbasis Runes (`$state`, `$derived`, `$props`), performa tinggi, bundle size kecil. |
+| **Framework** | **SvelteKit 2 + Svelte 5** | MIT | Framework fullstack resmi dengan Reactivity berbasis Runes (`$state`, `$derived`, `$props`), performa tinggi, dan file-based routing. |
 | **Styling** | **Tailwind CSS** | MIT | Utility-first CSS dengan dukungan penuh dark/light mode class. |
 | **Interactive Gantt** | **Frappe Gantt** | MIT | Zero-dependency, ringan (~15KB), bawaan ERPNext untuk visualisasi timeline proyek (`14_PRJ`). |
 | **Workflow Builder** | **XYFlow (`@xyflow/svelte`)** | MIT | Kanvas interaktif Node & Edge untuk visual approval flowchart (`22_WFL`). |
