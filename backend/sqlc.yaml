@@ -1,0 +1,15 @@
+version: "2"
+sql:
+  - engine: "postgresql"
+    schema: "migrations"
+    queries: "internal/modules/**/repository/queries.sql"
+    gen:
+      go:
+        package: "db"
+        out: "internal/platform/database/db"
+        sql_package: "pgx/v5"
+        overrides:
+          - db_type: "numeric"
+            go_type: "github.com/shopspring/decimal.Decimal"
+          - db_type: "uuid"
+            go_type: "github.com/google/uuid.UUID"
