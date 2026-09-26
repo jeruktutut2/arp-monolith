@@ -1,0 +1,104 @@
+# ========================================================
+# Enterprise ERP Monolith — Git Ignore Rules
+# ========================================================
+
+# --------------------------------------------------------
+# Environment & Secrets
+# --------------------------------------------------------
+.env
+.env.*
+!.env.example
+!.env.template
+*.pem
+*.key
+*.cert
+*.crt
+
+# --------------------------------------------------------
+# Go / Backend
+# --------------------------------------------------------
+# Binaries & build output
+bin/
+dist/
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+
+# Test & coverage artifacts
+*.test
+*.out
+c.out
+coverage.txt
+coverage.html
+
+# Go workspace
+go.work
+go.work.sum
+
+# Live-reload temporary files (e.g. Air)
+tmp/
+backend/tmp/
+
+# --------------------------------------------------------
+# Frontend (SvelteKit / Svelte 5 / Bun / Node)
+# --------------------------------------------------------
+node_modules/
+.svelte-kit/
+build/
+.output/
+package/
+.vite/
+
+# Package manager logs
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# --------------------------------------------------------
+# Local Data & Database Volumes
+# --------------------------------------------------------
+data/
+pgdata/
+postgres_data/
+redis_data/
+*.dump
+*.sql.gz
+*.bak
+
+# --------------------------------------------------------
+# Logs
+# --------------------------------------------------------
+logs/
+*.log
+
+# --------------------------------------------------------
+# Operating System Files
+# --------------------------------------------------------
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+[Dd]esktop.ini
+
+# --------------------------------------------------------
+# IDE & Code Editors
+# --------------------------------------------------------
+.idea/
+*.sublime-project
+*.sublime-workspace
+*.swp
+*.swo
+*~
+
+# VS Code (preserve shared settings/extensions recommendations if needed)
+.vscode/*
+!.vscode/settings.json
+!.vscode/tasks.json
+!.vscode/launch.json
+!.vscode/extensions.json

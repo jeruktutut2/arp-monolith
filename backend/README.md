@@ -34,7 +34,6 @@ backend/
 │       └── system/                 # Modul Pendukung (19_USR, 21_ADM, 22_WFL, 25_AUD)
 │
 ├── migrations/                     # Berkas DDL terurut golang-migrate (*.up.sql & *.down.sql)
-├── sqlc.yaml                       # Konfigurasi sqlc untuk type-safe SQL query generator
 ├── .env.example                    # Template variabel lingkungan
 └── go.mod                          # Go module dependencies
 ```

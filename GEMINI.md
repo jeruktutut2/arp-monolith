@@ -11,7 +11,7 @@ Dokumen ini adalah aturan wajib (*project rules*) untuk seluruh AI Agent saat be
   - **Driving Adapters**: HTTP Handlers dengan Echo v5 (`delivery/http`).
   - **Core Domain**: Model entitas bisnis, kalkulasi finansial (`decimal.Decimal`), dan aturan validasi invarian (`domain/`).
   - **Outbound Ports**: Interface Repository, EventBus, dan Consumer-Defined Contracts (`domain/contracts.go`).
-  - **Driven Adapters**: Akses PostgreSQL via `pgx/v5` & `sqlc` melalui **PgBouncer** (`repository/`).
+  - **Driven Adapters**: Akses PostgreSQL via native `pgx/v5` (`pgxpool.Pool`) melalui **PgBouncer** (`repository/`).
 - **Dilarang Keras Circular Dependency**:
   - Dilarang meng-import kode konkrit modul lain secara langsung.
   - Untuk dependensi sinkron, gunakan **Consumer-Defined Interface (Outbound Port)** pada `domain/contracts.go`.
