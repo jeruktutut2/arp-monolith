@@ -11,12 +11,7 @@ import (
 	"time"
 
 	"erp_monolith/backend/internal/modules/health"
-	adminDelivery "erp_monolith/backend/internal/modules/system/admin/delivery/http"
-	adminRepo "erp_monolith/backend/internal/modules/system/admin/repository"
-	adminUseCase "erp_monolith/backend/internal/modules/system/admin/usecase"
-	userDelivery "erp_monolith/backend/internal/modules/system/user/delivery/http"
-	userRepo "erp_monolith/backend/internal/modules/system/user/repository"
-	userUseCase "erp_monolith/backend/internal/modules/system/user/usecase"
+	"erp_monolith/backend/internal/modules/system"
 	"erp_monolith/backend/internal/platform/database"
 	"erp_monolith/backend/internal/platform/eventbus"
 
@@ -71,22 +66,8 @@ func main() {
 	// 6. Wire Business Modules
 	apiV1 := e.Group("/api/v1")
 
-	// System Modules (admin: 21_ADM, user: 19_USR)
-	if dbPool != nil {
-		// Admin / Multi-Company Submodule
-		companyRepo := adminRepo.NewPostgresCompanyRepo(dbPool)
-		companyUC := adminUseCase.NewCompanyUseCase(companyRepo)
-		companyHandler := adminDelivery.NewCompanyHandler(companyUC)
-		companyHandler.RegisterRoutes(apiV1)
-		fmt.Println("✅ Submodule [system/admin] routes wired to /api/v1/companies")
-
-		// User Management Submodule
-		userR := userRepo.NewPostgresUserRepo(dbPool)
-		userUC := userUseCase.NewUserUseCase(userR)
-		userHandler := userDelivery.NewUserHandler(userUC)
-		userHandler.RegisterRoutes(apiV1)
-		fmt.Println("✅ Submodule [system/user] routes wired to /api/v1/users")
-	}
+	// System Modules (admin: 21_ADM, user: 19_USR, audit: 25_AUD)
+	system.RegisterModule(apiV1, dbPool)
 
 	// 7. Graceful Server Start via Echo v5 StartConfig
 	fmt.Printf("🌐 Server listening on http://localhost:%s\n", port)
