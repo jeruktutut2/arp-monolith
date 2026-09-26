@@ -2,21 +2,22 @@ package config
 
 import (
 	"time"
+
+	"github.com/caarlos0/env/v11"
+	"github.com/joho/godotenv"
 )
 
 // Config aggregates all application configuration values
 type Config struct {
 	Server   ServerConfig
 	Database DatabaseConfig
-	JWT      JWTConfig
-	CORS     CORSConfig
 }
 
 // ServerConfig holds HTTP server configuration
 type ServerConfig struct {
-	Port    string
-	Env     string // "development", "staging", "production"
-	Version string
+	Port    string `env:"SERVER_PORT" envDefault:"8080"`
+	Env     string `env:"SERVER_ENV" envDefault:"development"`
+	Version string `env:"APP_VERSION" envDefault:"1.0.0"`
 }
 
 // IsProduction returns true if server runs in production environment
@@ -26,51 +27,22 @@ func (s ServerConfig) IsProduction() bool {
 
 // DatabaseConfig holds PostgreSQL & PgBouncer connection configuration
 type DatabaseConfig struct {
-	URL             string
-	DirectURL       string
-	MaxConns        int32
-	MinConns        int32
-	MaxConnLifetime time.Duration
-	MaxConnIdleTime time.Duration
+	URL             string        `env:"DATABASE_URL" envDefault:"postgres://erp_user:erp_secret@localhost:6432/erp_db?sslmode=disable"`
+	DirectURL       string        `env:"DIRECT_DATABASE_URL" envDefault:"postgres://erp_user:erp_secret@localhost:5432/erp_db?sslmode=disable"`
+	MaxConns        int32         `env:"DB_MAX_CONNS" envDefault:"50"`
+	MinConns        int32         `env:"DB_MIN_CONNS" envDefault:"10"`
+	MaxConnLifetime time.Duration `env:"DB_MAX_CONN_LIFETIME" envDefault:"1h"`
+	MaxConnIdleTime time.Duration `env:"DB_MAX_CONN_IDLE_TIME" envDefault:"30m"`
 }
 
-// JWTConfig holds JWT authentication configuration
-type JWTConfig struct {
-	Secret          string
-	ExpirationHours int
-}
-
-// CORSConfig holds CORS origin settings
-type CORSConfig struct {
-	AllowedOrigins []string
-}
-
-// Load loads configuration from environment variables (and optional .env file)
+// Load loads configuration from environment variables using caarlos0/env and godotenv
 func Load() (*Config, error) {
-	// Attempt loading from local .env files if present (does not overwrite existing environment variables)
-	_ = LoadEnvFile(".env", "../.env")
+	// Attempt to load .env if present (fails silently if file does not exist)
+	_ = godotenv.Load()
 
-	cfg := &Config{
-		Server: ServerConfig{
-			Port:    GetString("SERVER_PORT", "8080"),
-			Env:     GetString("SERVER_ENV", "development"),
-			Version: GetString("APP_VERSION", "1.0.0"),
-		},
-		Database: DatabaseConfig{
-			URL:             GetString("DATABASE_URL", "postgres://erp_user:erp_secret@localhost:6432/erp_db?sslmode=disable"),
-			DirectURL:       GetString("DIRECT_DATABASE_URL", "postgres://erp_user:erp_secret@localhost:5432/erp_db?sslmode=disable"),
-			MaxConns:        GetInt32("DB_MAX_CONNS", 50),
-			MinConns:        GetInt32("DB_MIN_CONNS", 10),
-			MaxConnLifetime: GetDuration("DB_MAX_CONN_LIFETIME", time.Hour),
-			MaxConnIdleTime: GetDuration("DB_MAX_CONN_IDLE_TIME", 30*time.Minute),
-		},
-		JWT: JWTConfig{
-			Secret:          GetString("JWT_SECRET", "super-secret-erp-jwt-key-change-in-production"),
-			ExpirationHours: GetInt("JWT_EXPIRATION_HOURS", 24),
-		},
-		CORS: CORSConfig{
-			AllowedOrigins: GetStringSlice("CORS_ALLOWED_ORIGINS", []string{"http://localhost:5173", "http://localhost:3000"}),
-		},
+	cfg := &Config{}
+	if err := env.Parse(cfg); err != nil {
+		return nil, err
 	}
 
 	return cfg, nil

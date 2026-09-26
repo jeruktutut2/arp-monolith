@@ -59,11 +59,7 @@ func main() {
 	// Standard Middlewares
 	e.Use(middleware.RequestID())
 	e.Use(middleware.Recover())
-	if len(cfg.CORS.AllowedOrigins) > 0 {
-		e.Use(middleware.CORS(cfg.CORS.AllowedOrigins...))
-	} else {
-		e.Use(middleware.CORS())
-	}
+	e.Use(middleware.CORS())
 
 	// 5. Wire Health Check Module
 	health.RegisterModule(e, dbPool)
