@@ -25,7 +25,7 @@ type Pagination struct {
 }
 
 // Success returns a 200/201 HTTP JSON success response
-func Success(c echo.Context, status int, message string, data interface{}) error {
+func Success(c *echo.Context, status int, message string, data interface{}) error {
 	return c.JSON(status, StandardResponse{
 		Success: true,
 		Code:    "OK",
@@ -36,7 +36,7 @@ func Success(c echo.Context, status int, message string, data interface{}) error
 }
 
 // Paginated returns a 200 HTTP JSON success response with pagination
-func Paginated(c echo.Context, message string, data interface{}, meta Pagination) error {
+func Paginated(c *echo.Context, message string, data interface{}, meta Pagination) error {
 	return c.JSON(http.StatusOK, StandardResponse{
 		Success: true,
 		Code:    "OK",
@@ -48,7 +48,7 @@ func Paginated(c echo.Context, message string, data interface{}, meta Pagination
 }
 
 // Error returns an error response
-func Error(c echo.Context, status int, code, message string) error {
+func Error(c *echo.Context, status int, code, message string) error {
 	return c.JSON(status, StandardResponse{
 		Success: false,
 		Code:    code,

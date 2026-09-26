@@ -6,7 +6,7 @@ Dokumen ini adalah aturan wajib (*project rules*) untuk seluruh AI Agent saat be
 
 ## 🏛️ 1. Arsitektur Inti: Hexagonal Modular Monolith
 - **Bahasa & Backend Framework**: **Golang (Go 1.22+)** dengan **Echo v5** (`github.com/labstack/echo/v5`) sebagai routing & HTTP delivery adapter.
-- **Pola Arsitektur**: **Hexagonal Architecture (Ports & Adapters)** di setiap modul bisnis dalam satu kesatuan Modular Monolith.
+- **Pola Arsitektur**: **Hexagonal Architecture (Ports & Adapters)** di setiap modul & submodul bisnis (`internal/modules/<nama_modul>/<submodul>/`) dalam satu kesatuan Modular Monolith.
   - **Inbound Ports**: Interface Usecase/Application service.
   - **Driving Adapters**: HTTP Handlers dengan Echo v5 (`delivery/http`).
   - **Core Domain**: Model entitas bisnis, kalkulasi finansial (`decimal.Decimal`), dan aturan validasi invarian (`domain/`).

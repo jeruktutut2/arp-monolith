@@ -9,11 +9,14 @@ import (
 	"syscall"
 	"time"
 
+	adminDelivery "erp_monolith/backend/internal/modules/system/admin/delivery/http"
+	adminRepo "erp_monolith/backend/internal/modules/system/admin/repository"
+	adminUseCase "erp_monolith/backend/internal/modules/system/admin/usecase"
+	userDelivery "erp_monolith/backend/internal/modules/system/user/delivery/http"
+	userRepo "erp_monolith/backend/internal/modules/system/user/repository"
+	userUseCase "erp_monolith/backend/internal/modules/system/user/usecase"
 	"erp_monolith/backend/internal/platform/database"
 	"erp_monolith/backend/internal/platform/eventbus"
-	sysDelivery "erp_monolith/backend/internal/modules/system/delivery/http"
-	sysRepo "erp_monolith/backend/internal/modules/system/repository"
-	sysUseCase "erp_monolith/backend/internal/modules/system/usecase"
 
 	"github.com/labstack/echo/v5"
 	"github.com/labstack/echo/v5/middleware"
@@ -54,16 +57,14 @@ func main() {
 
 	// 4. Initialize Echo v5 Web Server
 	e := echo.New()
-	e.HideBanner = true
 
 	// Standard Middlewares
 	e.Use(middleware.RequestID())
-	e.Use(middleware.Logger())
 	e.Use(middleware.Recover())
 	e.Use(middleware.CORS())
 
 	// Health check endpoint
-	e.GET("/health", func(c echo.Context) error {
+	e.GET("/health", func(c *echo.Context) error {
 		return c.JSON(http.StatusOK, map[string]interface{}{
 			"status":    "healthy",
 			"timestamp": time.Now().UTC().Format(time.RFC3339),
@@ -74,20 +75,32 @@ func main() {
 	// 5. Wire Hexagonal Modules
 	apiV1 := e.Group("/api/v1")
 
-	// System Module (21_ADM / Multi-Company)
+	// System Modules (admin: 21_ADM, user: 19_USR)
 	if dbPool != nil {
-		companyRepo := sysRepo.NewPostgresCompanyRepo(dbPool)
-		companyUC := sysUseCase.NewCompanyUseCase(companyRepo)
-		companyHandler := sysDelivery.NewCompanyHandler(companyUC)
+		// Admin / Multi-Company Submodule
+		companyRepo := adminRepo.NewPostgresCompanyRepo(dbPool)
+		companyUC := adminUseCase.NewCompanyUseCase(companyRepo)
+		companyHandler := adminDelivery.NewCompanyHandler(companyUC)
 		companyHandler.RegisterRoutes(apiV1)
-		fmt.Println("✅ Module [System / ADM] routes wired to /api/v1/companies")
+		fmt.Println("✅ Submodule [system/admin] routes wired to /api/v1/companies")
+
+		// User Management Submodule
+		userR := userRepo.NewPostgresUserRepo(dbPool)
+		userUC := userUseCase.NewUserUseCase(userR)
+		userHandler := userDelivery.NewUserHandler(userUC)
+		userHandler.RegisterRoutes(apiV1)
+		fmt.Println("✅ Submodule [system/user] routes wired to /api/v1/users")
 	}
 
 	// 6. Graceful Server Start
+	srv := &http.Server{
+		Addr:    ":" + port,
+		Handler: e,
+	}
+
 	go func() {
-		addr := ":" + port
-		fmt.Printf("🌐 Server listening on http://localhost%s\n", addr)
-		if err := e.Start(addr); err != nil && err != http.ErrServerClosed {
+		fmt.Printf("🌐 Server listening on http://localhost:%s\n", port)
+		if err := srv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
 			fmt.Printf("Server startup error: %v\n", err)
 		}
 	}()
@@ -101,7 +114,7 @@ func main() {
 	shutdownCtx, shutdownCancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer shutdownCancel()
 
-	if err := e.Shutdown(shutdownCtx); err != nil {
+	if err := srv.Shutdown(shutdownCtx); err != nil {
 		fmt.Printf("Forced shutdown: %v\n", err)
 	}
 	fmt.Println("👋 ERP backend stopped cleanly.")

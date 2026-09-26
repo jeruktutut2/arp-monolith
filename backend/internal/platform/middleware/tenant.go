@@ -17,7 +17,7 @@ const (
 // TenantScope middleware ensures every authenticated request has valid CompanyID & BranchID
 func TenantScope() echo.MiddlewareFunc {
 	return func(next echo.HandlerFunc) echo.HandlerFunc {
-		return func(c echo.Context) error {
+		return func(c *echo.Context) error {
 			companyHeader := c.Request().Header.Get(HeaderCompanyID)
 			branchHeader := c.Request().Header.Get(HeaderBranchID)
 

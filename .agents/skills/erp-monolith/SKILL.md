@@ -68,12 +68,14 @@ Gunakan checklist lengkap di [Checklist Implementasi Modul](./references/module-
 
 ---
 
-## 📂 Struktur File Standar per Modul (Hexagonal)
+## 📂 Struktur File Standar per Modul & Submodul (Hexagonal)
 
-Setiap modul di bawah `internal/modules/<nama_modul>/` wajib memiliki struktur:
+Seluruh modul bisnis di bawah `internal/modules/<nama_modul>/` dibagi ke dalam submodul spesifik (`internal/modules/<nama_modul>/<submodul>/`), contoh: `system/admin`, `system/user`, `acc/gl`, `inv/item`, `pur/order`, `sal/pos`, `hrm/payroll`, dll.
+
+Setiap submodul menerapkan arsitektur Hexagonal lengkap:
 
 ```text
-internal/modules/<nama_modul>/
+internal/modules/<nama_modul>/<submodul>/
 ├── domain/                   # Hexagon Core
 │   ├── entity.go             # Struct domain utama dan validation rules
 │   ├── errors.go             # Sentinel errors domain (ErrNotFound, ErrInvalidState)
