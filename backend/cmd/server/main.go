@@ -28,7 +28,6 @@ func main() {
 	if err != nil {
 		fmt.Printf("⚠️ Warning: Failed to load config: %v\n", err)
 	}
-	port := cfg.Server.Port
 
 	// 2. Database Pool via PgBouncer
 	ctx, cancel := context.WithCancel(context.Background())
@@ -68,13 +67,13 @@ func main() {
 	system.RegisterModule(e, dbPool)
 
 	// 7. Graceful Server Start via Echo v5 StartConfig
-	fmt.Printf("🌐 Server listening on http://localhost:%s\n", port)
+	fmt.Printf("🌐 Server listening on http://localhost:%s\n", cfg.Server.Port)
 
 	serverCtx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
 
 	sc := echo.StartConfig{
-		Address:         ":" + port,
+		Address:         ":" + cfg.Server.Port,
 		GracefulTimeout: 10 * time.Second,
 		HideBanner:      true,
 		HidePort:        true,
