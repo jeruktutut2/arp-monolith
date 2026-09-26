@@ -9,6 +9,10 @@ import (
 	"syscall"
 	"time"
 
+	healthDelivery "erp_monolith/backend/internal/modules/health/check/delivery/http"
+	healthDomain "erp_monolith/backend/internal/modules/health/check/domain"
+	healthRepo "erp_monolith/backend/internal/modules/health/check/repository"
+	healthUseCase "erp_monolith/backend/internal/modules/health/check/usecase"
 	adminDelivery "erp_monolith/backend/internal/modules/system/admin/delivery/http"
 	adminRepo "erp_monolith/backend/internal/modules/system/admin/repository"
 	adminUseCase "erp_monolith/backend/internal/modules/system/admin/usecase"
@@ -63,16 +67,17 @@ func main() {
 	e.Use(middleware.Recover())
 	e.Use(middleware.CORS())
 
-	// Health check endpoint
-	e.GET("/health", func(c *echo.Context) error {
-		return c.JSON(http.StatusOK, map[string]interface{}{
-			"status":    "healthy",
-			"timestamp": time.Now().UTC().Format(time.RFC3339),
-			"version":   "1.0.0",
-		})
-	})
+	// 5. Wire Health Check Module
+	var healthChecker healthDomain.HealthChecker
+	if dbPool != nil {
+		healthChecker = healthRepo.NewPostgresHealthChecker(dbPool)
+	}
+	healthUC := healthUseCase.NewHealthUseCase("1.0.0", healthChecker)
+	healthHandler := healthDelivery.NewHealthHandler(healthUC)
+	healthHandler.RegisterRoutes(e)
+	fmt.Println("✅ Module [Health Check] route wired to /health")
 
-	// 5. Wire Hexagonal Modules
+	// 6. Wire Business Modules
 	apiV1 := e.Group("/api/v1")
 
 	// System Modules (admin: 21_ADM, user: 19_USR)
