@@ -12,6 +12,7 @@ import (
 
 	"erp_monolith/backend/internal/modules/health"
 	"erp_monolith/backend/internal/modules/system"
+	"erp_monolith/backend/internal/platform/config"
 	"erp_monolith/backend/internal/platform/database"
 	"erp_monolith/backend/internal/platform/eventbus"
 
@@ -23,22 +24,22 @@ func main() {
 	fmt.Println("🚀 Starting Enterprise ERP Monolith Backend...")
 
 	// 1. Environment & Config
-	port := os.Getenv("SERVER_PORT")
-	if port == "" {
-		port = "8080"
+	cfg, err := config.Load()
+	if err != nil {
+		fmt.Printf("⚠️ Warning: Failed to load config: %v\n", err)
 	}
-	dbURL := os.Getenv("DATABASE_URL")
-	if dbURL == "" {
-		// Default to PgBouncer port 6432
-		dbURL = "postgres://erp_user:erp_secret@localhost:6432/erp_db?sslmode=disable"
-	}
+	port := cfg.Server.Port
 
 	// 2. Database Pool via PgBouncer
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
 	dbPool, err := database.NewPool(ctx, database.Config{
-		URL: dbURL,
+		URL:             cfg.Database.URL,
+		MaxConns:        cfg.Database.MaxConns,
+		MinConns:        cfg.Database.MinConns,
+		MaxConnLifetime: cfg.Database.MaxConnLifetime,
+		MaxConnIdleTime: cfg.Database.MaxConnIdleTime,
 	})
 	if err != nil {
 		fmt.Printf("❌ Failed to initialize database pool: %v\n", err)
@@ -58,7 +59,11 @@ func main() {
 	// Standard Middlewares
 	e.Use(middleware.RequestID())
 	e.Use(middleware.Recover())
-	e.Use(middleware.CORS())
+	if len(cfg.CORS.AllowedOrigins) > 0 {
+		e.Use(middleware.CORS(cfg.CORS.AllowedOrigins...))
+	} else {
+		e.Use(middleware.CORS())
+	}
 
 	// 5. Wire Health Check Module
 	health.RegisterModule(e, dbPool)
