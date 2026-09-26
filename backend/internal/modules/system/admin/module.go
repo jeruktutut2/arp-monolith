@@ -11,8 +11,8 @@ import (
 	"github.com/labstack/echo/v5"
 )
 
-// RegisterModule initializes and wires admin/multi-company components to the Echo router group
-func RegisterModule(g *echo.Group, pool *pgxpool.Pool) {
+// RegisterModule initializes and wires admin/multi-company components to the Echo server
+func RegisterModule(e *echo.Echo, pool *pgxpool.Pool) {
 	if pool == nil {
 		return
 	}
@@ -20,7 +20,7 @@ func RegisterModule(g *echo.Group, pool *pgxpool.Pool) {
 	companyRepo := adminRepo.NewPostgresCompanyRepo(pool)
 	companyUC := adminUseCase.NewCompanyUseCase(companyRepo)
 	companyHandler := adminDelivery.NewCompanyHandler(companyUC)
-	companyHandler.RegisterRoutes(g)
+	companyHandler.RegisterRoutes(e)
 
 	fmt.Println("✅ Submodule [system/admin] routes wired to /api/v1/companies")
 }

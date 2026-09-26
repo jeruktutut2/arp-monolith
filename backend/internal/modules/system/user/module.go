@@ -11,8 +11,8 @@ import (
 	"github.com/labstack/echo/v5"
 )
 
-// RegisterModule initializes and wires user management components to the Echo router group
-func RegisterModule(g *echo.Group, pool *pgxpool.Pool) {
+// RegisterModule initializes and wires user management components to the Echo server
+func RegisterModule(e *echo.Echo, pool *pgxpool.Pool) {
 	if pool == nil {
 		return
 	}
@@ -20,7 +20,7 @@ func RegisterModule(g *echo.Group, pool *pgxpool.Pool) {
 	userR := userRepo.NewPostgresUserRepo(pool)
 	userUC := userUseCase.NewUserUseCase(userR)
 	userHandler := userDelivery.NewUserHandler(userUC)
-	userHandler.RegisterRoutes(g)
+	userHandler.RegisterRoutes(e)
 
 	fmt.Println("✅ Submodule [system/user] routes wired to /api/v1/users")
 }

@@ -10,8 +10,8 @@ import (
 )
 
 // RegisterModule initializes and registers all system submodules (admin, user, audit)
-func RegisterModule(g *echo.Group, pool *pgxpool.Pool) {
-	admin.RegisterModule(g, pool)
-	user.RegisterModule(g, pool)
-	audit.RegisterModule(g, pool)
+func RegisterModule(e *echo.Echo, pool *pgxpool.Pool) {
+	admin.RegisterModule(e, pool)
+	user.RegisterModule(e, pool)
+	audit.RegisterModule(e, pool)
 }

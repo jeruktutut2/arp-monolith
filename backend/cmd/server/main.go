@@ -63,11 +63,8 @@ func main() {
 	// 5. Wire Health Check Module
 	health.RegisterModule(e, dbPool)
 
-	// 6. Wire Business Modules
-	apiV1 := e.Group("/api/v1")
-
-	// System Modules (admin: 21_ADM, user: 19_USR, audit: 25_AUD)
-	system.RegisterModule(apiV1, dbPool)
+	// 6. Wire Business Modules (admin: 21_ADM, user: 19_USR, audit: 25_AUD)
+	system.RegisterModule(e, dbPool)
 
 	// 7. Graceful Server Start via Echo v5 StartConfig
 	fmt.Printf("🌐 Server listening on http://localhost:%s\n", port)
