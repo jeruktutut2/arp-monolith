@@ -9,10 +9,7 @@ import (
 	"syscall"
 	"time"
 
-	healthDelivery "erp_monolith/backend/internal/modules/health/check/delivery/http"
-	healthDomain "erp_monolith/backend/internal/modules/health/check/domain"
-	healthRepo "erp_monolith/backend/internal/modules/health/check/repository"
-	healthUseCase "erp_monolith/backend/internal/modules/health/check/usecase"
+	"erp_monolith/backend/internal/modules/health"
 	adminDelivery "erp_monolith/backend/internal/modules/system/admin/delivery/http"
 	adminRepo "erp_monolith/backend/internal/modules/system/admin/repository"
 	adminUseCase "erp_monolith/backend/internal/modules/system/admin/usecase"
@@ -68,14 +65,7 @@ func main() {
 	e.Use(middleware.CORS())
 
 	// 5. Wire Health Check Module
-	var healthChecker healthDomain.HealthChecker
-	if dbPool != nil {
-		healthChecker = healthRepo.NewPostgresHealthChecker(dbPool)
-	}
-	healthUC := healthUseCase.NewHealthUseCase("1.0.0", healthChecker)
-	healthHandler := healthDelivery.NewHealthHandler(healthUC)
-	healthHandler.RegisterRoutes(e)
-	fmt.Println("✅ Module [Health Check] route wired to /health")
+	health.RegisterModule(e, dbPool)
 
 	// 6. Wire Business Modules
 	apiV1 := e.Group("/api/v1")
