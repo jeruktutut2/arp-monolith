@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"net/http"
 	"os"
@@ -87,30 +88,22 @@ func main() {
 		fmt.Println("✅ Submodule [system/user] routes wired to /api/v1/users")
 	}
 
-	// 6. Graceful Server Start
-	srv := &http.Server{
-		Addr:    ":" + port,
-		Handler: e,
+	// 7. Graceful Server Start via Echo v5 StartConfig
+	fmt.Printf("🌐 Server listening on http://localhost:%s\n", port)
+
+	serverCtx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
+	defer stop()
+
+	sc := echo.StartConfig{
+		Address:         ":" + port,
+		GracefulTimeout: 10 * time.Second,
+		HideBanner:      true,
+		HidePort:        true,
 	}
 
-	go func() {
-		fmt.Printf("🌐 Server listening on http://localhost:%s\n", port)
-		if err := srv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
-			fmt.Printf("Server startup error: %v\n", err)
-		}
-	}()
-
-	// Wait for interrupt signal to gracefully shut down the server
-	quit := make(chan os.Signal, 1)
-	signal.Notify(quit, os.Interrupt, syscall.SIGTERM)
-	<-quit
-
-	fmt.Println("\n⏳ Shutting down ERP backend gracefully...")
-	shutdownCtx, shutdownCancel := context.WithTimeout(context.Background(), 10*time.Second)
-	defer shutdownCancel()
-
-	if err := srv.Shutdown(shutdownCtx); err != nil {
-		fmt.Printf("Forced shutdown: %v\n", err)
+	if err := sc.Start(serverCtx, e); err != nil && !errors.Is(err, http.ErrServerClosed) {
+		fmt.Printf("❌ Server error: %v\n", err)
 	}
-	fmt.Println("👋 ERP backend stopped cleanly.")
+
+	fmt.Println("\n👋 ERP backend stopped cleanly.")
 }
