@@ -76,9 +76,97 @@ Sesuai template konfigurasi lingkungan proyek (`backend/.env.example`), kredensi
 - **Username**: `erp_user`
 - **Password**: `erp_secret`
 
-### Buat User & Database via `psql`
+### A. Metode 1: Langkah Demi Langkah Interaktif (1 per 1 di Terminal `psql`)
 
-Jalankan perintah berikut menggunakan user sistem `postgres`:
+Gunakan cara ini jika Anda ingin menjalankan perintah satu per satu secara interaktif di dalam console `psql`.
+
+#### Langkah 1: Masuk ke Konsol PostgreSQL (`psql`)
+Masuk ke prompt interaktif PostgreSQL sebagai superuser sistem `postgres`:
+```bash
+sudo -u postgres psql
+```
+*(Alternatif: bisa juga menggunakan `sudo -i -u postgres` kemudian ketik `psql`)*.
+
+Setelah berhasil masuk, prompt terminal akan berubah menjadi:
+```text
+postgres=#
+```
+
+#### Langkah 2: Buat User ERP (`erp_user`)
+Ketik perintah SQL berikut untuk membuat user ERP dengan password terenkripsi:
+```sql
+CREATE USER erp_user WITH PASSWORD 'erp_secret';
+```
+> **Output sukses**: `CREATE ROLE`
+
+#### Langkah 3: Berikan Izin Pembuatan Database (`CREATEDB`)
+Berikan hak kepada `erp_user` untuk membuat database (berguna untuk otomatisasi running test integrasi):
+```sql
+ALTER USER erp_user CREATEDB;
+```
+> **Output sukses**: `ALTER ROLE`
+
+#### Langkah 4: Buat Database `erp_db`
+Buat database utama ERP dengan pemilik `erp_user` serta encoding `UTF-8`:
+```sql
+CREATE DATABASE erp_db OWNER erp_user ENCODING 'UTF8' LC_COLLATE 'en_US.UTF-8' LC_CTYPE 'en_US.UTF-8';
+```
+> **Output sukses**: `CREATE DATABASE`
+
+#### Langkah 5: Masuk / Beralih ke Database `erp_db`
+Gunakan meta-command `\c` untuk beralih konteks dari database `postgres` ke `erp_db`:
+```sql
+\c erp_db
+```
+> **Output sukses**:
+> ```text
+> You are now connected to database "erp_db" as user "postgres".
+> erp_db=#
+> ```
+Prompt terminal sekarang telah berubah menjadi `erp_db=#`.
+
+#### Langkah 6: Aktifkan Ekstensi PostgreSQL yang Dibutuhkan
+Jalankan perintah SQL berikut untuk mengaktifkan ekstensi UUID generator, enkripsi, dan performa query:
+```sql
+-- Ekstensi UUID generator & kriptografi
+CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
+CREATE EXTENSION IF NOT EXISTS "pgcrypto";
+
+-- Ekstensi performa & audit (opsional untuk reporting dan pencarian teks)
+CREATE EXTENSION IF NOT EXISTS "pg_trgm";
+CREATE EXTENSION IF NOT EXISTS "btree_gist";
+```
+> **Output sukses**: Muncul konfirmasi `CREATE EXTENSION` untuk masing-masing ekstensi.
+
+#### Langkah 7: Berikan Hak Akses Penuh Skema `public` ke `erp_user`
+Atur hak akses pada skema `public` saat ini maupun untuk tabel & sequence baru yang akan dibuat kemudian:
+```sql
+-- Berikan semua hak akses pada skema public
+GRANT ALL PRIVILEGES ON SCHEMA public TO erp_user;
+GRANT ALL PRIVILEGES ON ALL TABLES IN SCHEMA public TO erp_user;
+GRANT ALL PRIVILEGES ON ALL SEQUENCES IN SCHEMA public TO erp_user;
+
+-- Berikan hak akses default untuk objek-objek baru di masa depan
+ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT ALL ON TABLES TO erp_user;
+ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT ALL ON SEQUENCES TO erp_user;
+```
+> **Output sukses**: Muncul konfirmasi `GRANT` dan `ALTER DEFAULT PRIVILEGES`.
+
+#### Langkah 8: Verifikasi & Keluar dari `psql`
+Untuk memverifikasi koneksi dan melihat detail database `erp_db`:
+```sql
+\l erp_db
+```
+Untuk keluar dari sesi `psql` dan kembali ke terminal Linux:
+```sql
+\q
+```
+
+---
+
+### B. Metode 2: Eksekusi Sekaligus (Otomatis via Bash Here-Doc `EOF`)
+
+Jika Anda ingin membuat user, database, ekstensi, dan hak akses sekaligus secara instan tanpa perlu masuk ke konsol interaktif satu per satu, jalankan skrip berikut:
 
 ```bash
 sudo -u postgres psql << 'EOF'
