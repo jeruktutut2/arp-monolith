@@ -71,15 +71,29 @@ sudo apt update && sudo apt install -y curl apt-transport-https lsb-release
 ```
 
 ### Langkah 2: Tambahkan Repositori Resmi Kong Gateway OSS
+Gunakan repositori versi 3.9 (`gateway-39`) dari Cloudsmith Kong resmi:
 ```bash
-curl -1sLf "https://packages.konghq.com/public/gateway-3x/setup.deb.sh" | sudo -E bash
+curl -1sLf "https://packages.konghq.com/public/gateway-39/setup.deb.sh" | sudo -E bash
 ```
+
+> [!TIP]
+> **Catatan Penamaan Repositori Cloudsmith:**
+> Cloudsmith Kong menggunakan penamaan minor version seperti `gateway-39` (versi 3.9 OSS). Penggunaan URL lama seperti `gateway-3x` akan mengembalikan kode HTTP 404 sehingga script tidak mengeksekusi apapun dan menyebabkan error `E: Unable to locate package kong` pada saat `apt install`.
 
 ### Langkah 3: Pasang Paket Kong
 ```bash
 sudo apt update
 sudo apt install -y kong
 ```
+
+> [!NOTE]
+> **Metode Alternatif (Direct `.deb` Package):**
+> Jika ingin memasang langsung tanpa script registrasi repositori:
+> ```bash
+> # Untuk Ubuntu 24.04 (Noble) x86_64:
+> curl -Lo /tmp/kong.deb "https://packages.konghq.com/public/gateway-39/deb/ubuntu/pool/noble/main/k/ko/kong_3.9.3/kong_3.9.3_amd64.deb"
+> sudo apt install -y /tmp/kong.deb
+> ```
 
 ### Langkah 4: Verifikasi Instalasi
 ```bash
