@@ -60,10 +60,10 @@ pnpm-debug.log*
 # --------------------------------------------------------
 # Local Data & Database Volumes
 # --------------------------------------------------------
-data/
-pgdata/
-postgres_data/
-redis_data/
+/data/
+/pgdata/
+/postgres_data/
+/redis_data/
 *.dump
 *.sql.gz
 *.bak
