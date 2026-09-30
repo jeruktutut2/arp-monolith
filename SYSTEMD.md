@@ -16,6 +16,7 @@ Dokumen ini adalah panduan resmi untuk men-deploy dan mengelola layanan backend 
    - [B. Build Produksi Frontend](#b-build-produksi-frontend)
    - [C. Berkas Environment Frontend (`/etc/erp/erp-frontend.env`)](#c-berkas-environment-frontend)
    - [D. Berkas Unit Systemd Frontend (`erp-frontend.service`)](#d-berkas-unit-systemd-frontend)
+   - [E. Integrasi Alur Penerimaan Hasil Build dari GitHub Actions](#e-integrasi-alur-penerimaan-hasil-build-dari-github-actions)
 5. [Manajemen Terpadu dengan Systemd Target (`erp.target`)](#5-manajemen-terpadu-dengan-systemd-target)
 6. [Integrasi Reverse Proxy (Nginx)](#6-integrasi-reverse-proxy-nginx)
 7. [Skrip Otomasi Deployment (`deploy.sh`)](#7-skrip-otomasi-deployment)
@@ -257,6 +258,9 @@ sudo chown -R erp:erp /opt/dev/erp_monolith/frontend
 
 Hasil build akan tersimpan di direktori `/opt/dev/erp_monolith/frontend/build`.
 
+> 💡 **Build di VPS vs Menerima Build dari GitHub Actions (CI/CD):**
+> Perintah di atas digunakan jika Anda memilih melakukan build lokal langsung di VPS. Namun, pada alur CI/CD produksi yang direkomendasikan ([GITHUB_ACTIONS.md](file:///opt/dev/erp_monolith/GITHUB_ACTIONS.md)), proses `bun run build` dijalankan di GitHub Actions runner. VPS hanya menerima hasil kompilasi folder `frontend/build/` via SSH/Rsync sehingga server terbebas dari lonjakan RAM/CPU saat proses build. Lihat detail penerimaan dan konfigurasinya di [Sub-bab E](#e-integrasi-alur-penerimaan-hasil-build-dari-github-actions).
+
 ### C. Berkas Environment Frontend
 Buat berkas konfigurasi di `/etc/erp/erp-frontend.env`:
 
@@ -347,6 +351,130 @@ Jika memilih menjalankan langsung di atas Bun, ubah baris `ExecStart`:
 ```ini
 # Cari path bun terlebih dahulu dengan: which bun (biasanya /usr/local/bin/bun atau /home/user/.bun/bin/bun)
 ExecStart=/usr/local/bin/bun ./build/index.js
+```
+
+### E. Integrasi Alur Penerimaan Hasil Build dari GitHub Actions (CI/CD Artifact)
+
+Jika Anda menerapkan alur pengiriman otomatis menggunakan **GitHub Actions** (seperti yang dikonfigurasi pada [.github/workflows/deploy.yml](file:///opt/dev/erp_monolith/.github/workflows/deploy.yml) dan [GITHUB_ACTIONS.md](file:///opt/dev/erp_monolith/GITHUB_ACTIONS.md)), proses deployment frontend ke Systemd memiliki alur dan karakteristik khusus:
+
+#### 1. Arsitektur Penerimaan Artifact
+- **Build di GitHub Actions Runner**: Runner GitHub mengompilasi SvelteKit 2 menggunakan Bun (`bun install --frozen-lockfile` & `bun run build`) menghasilkan artefak rilis di folder `frontend/build/`.
+- **Pengiriman Tanpa Source Code Mentah**: Hanya direktori `build/` terkompilasi yang dikirimkan ke server VPS via SSH/Rsync ke path target:
+  ```text
+  /opt/dev/erp_monolith/frontend/build/
+  ```
+- **Struktur Berkas di VPS**:
+  ```text
+  /opt/dev/erp_monolith/frontend/
+  ├── build/
+  │   ├── index.js          # Entrypoint server (Polka / Node HTTP)
+  │   ├── handler.js        # Request handler SvelteKit
+  │   ├── env.js            # Injeksi runtime environment variable
+  │   ├── shims.js          # Node polyfill compatibility
+  │   ├── client/           # Aset statis client browser (_app/immutable/, CSS, JS)
+  │   └── server/           # Server chunks & logika SSR (seluruh pustaka runtime telah dibundle)
+  ```
+- **Kelebihan**: Server VPS **tidak membutuhkan** instalasi compiler, devDependencies, maupun direktori `node_modules/` (ratusan MB). Hanya runtime minimal Node.js atau Bun yang dibutuhkan untuk mengeksekusi `index.js`.
+
+#### 2. Penanganan Hak Akses & Kepemilikan (User `deployer` vs `erp`)
+Ketika GitHub Actions mentransfer berkas menggunakan akun SSH `deployer` (yang tergabung dalam grup `erp`), berkas build baru akan tercatat sebagai milik `deployer:erp`. Agar service Systemd yang dijalankan oleh user `erp` dapat mengakses dan membaca hasil build:
+
+- **Langkah 1 — Terapkan Flag SetGID pada Direktori Build VPS:**
+  Jalankan perintah ini satu kali di server VPS:
+  ```bash
+  # Pastikan direktori induk frontend/build ada
+  sudo mkdir -p /opt/dev/erp_monolith/frontend/build
+
+  # Tetapkan kepemilikan deployer dan grup erp
+  sudo chown -R deployer:erp /opt/dev/erp_monolith/frontend/build
+
+  # Berikan izin baca-tulis-eksekusi untuk pemilik dan grup
+  sudo chmod -R 775 /opt/dev/erp_monolith/frontend/build
+
+  # Aktifkan SetGID agar file baru dari rsync otomatis mewarisi grup 'erp'
+  sudo chmod g+s /opt/dev/erp_monolith/frontend/build
+  ```
+
+- **Langkah 2 — Penyesuaian Izin Pasca Sinkronisasi:**
+  Jika tidak menggunakan SetGID, tambahkan perintah `chown` di blok script deployment GitHub Actions atau skrip transfer:
+  ```bash
+  sudo chown -R erp:erp /opt/dev/erp_monolith/frontend/build
+  ```
+
+#### 3. Konfigurasi Unit Systemd Frontend Khusus Hasil Build GitHub (`erp-frontend.service`)
+Berikut adalah berkas unit `/etc/systemd/system/erp-frontend.service` yang dirancang khusus untuk mengeksekusi hasil build yang diterima dari GitHub Actions:
+
+```ini
+[Unit]
+Description=Enterprise ERP Monolith - SvelteKit 2 Frontend Service (GitHub Actions Build)
+Documentation=https://github.com/jeruktutut2/arp-monolith
+After=network.target erp-backend.service
+Wants=erp-backend.service
+
+[Service]
+Type=exec
+User=erp
+Group=erp
+
+# Direktori kerja frontend
+WorkingDirectory=/opt/dev/erp_monolith/frontend
+
+# File environment produksi (memuat PORT=3000, HOST=127.0.0.1, ORIGIN, dll.)
+EnvironmentFile=/etc/erp/erp-frontend.env
+
+# Eksekusi entrypoint hasil build yang diterima dari GitHub Actions
+ExecStart=/usr/bin/node /opt/dev/erp_monolith/frontend/build/index.js
+
+# Siklus Hidup & Restart Otomatis
+Restart=always
+RestartSec=5s
+KillMode=process
+KillSignal=SIGTERM
+TimeoutStopSec=20s
+
+# Hardening Sandbox Linux
+NoNewPrivileges=true
+ProtectSystem=full
+ProtectHome=true
+PrivateTmp=true
+
+# Batas Resource
+LimitNOFILE=65536
+
+# Integrasi Logging Journald
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=erp-frontend
+
+[Install]
+WantedBy=multi-user.target
+```
+
+> 💡 **Opsi Alternatif Runtime Bun:**
+> Jika Anda menggunakan runtime Bun di VPS, cukup sesuaikan baris `ExecStart`:
+> ```ini
+> ExecStart=/usr/local/bin/bun /opt/dev/erp_monolith/frontend/build/index.js
+> ```
+
+#### 4. Alur Restart & Health Check Pasca Penerimaan Build
+Setelah step transfer Rsync selesai memindahkan file build ke VPS, skrip GitHub Actions akan mengeksekusi perintah reload & restart berikut melalui SSH:
+
+```bash
+# 1. Pastikan berkas entrypoint index.js dapat dibaca
+test -f /opt/dev/erp_monolith/frontend/build/index.js || { echo "❌ build/index.js tidak ditemukan!"; exit 1; }
+
+# 2. Restart unit service frontend secara graceful
+sudo systemctl restart erp-frontend.service
+
+# 3. Verifikasi ketersediaan service (Health Check internal port 3000)
+sleep 3
+curl -fs http://127.0.0.1:3000 > /dev/null || {
+  echo "❌ Frontend gagal merespons setelah restart!"
+  sudo journalctl -u erp-frontend -n 50 --no-pager
+  exit 1
+}
+
+echo "✅ Frontend berhasil diperbarui dari build GitHub Actions dan aktif."
 ```
 
 ---
@@ -537,12 +665,19 @@ chmod +x bin/erp-backend.new
 mv -f bin/erp-backend.new bin/erp-backend
 chown erp:erp bin/erp-backend
 
-# 4. Kompilasi Frontend SvelteKit
-echo "🎨 Mengompilasi frontend SvelteKit..."
-cd "${FRONTEND_DIR}"
-bun install --frozen-lockfile
-bun run build
-chown -R erp:erp "${FRONTEND_DIR}/build"
+# 4. Kompilasi / Penyiapan Frontend SvelteKit
+# Catatan: Jika menggunakan GitHub Actions, tahap build sudah dilakukan di runner
+# dan folder build langsung disinkronkan via Rsync ke ${FRONTEND_DIR}/build
+if [ -f "${FRONTEND_DIR}/build/index.js" ]; then
+    echo "🎨 Build frontend dari GitHub Actions terdeteksi, memastikan hak akses..."
+    chown -R erp:erp "${FRONTEND_DIR}/build"
+else
+    echo "🎨 Melakukan kompilasi frontend SvelteKit secara lokal..."
+    cd "${FRONTEND_DIR}"
+    bun install --frozen-lockfile
+    bun run build
+    chown -R erp:erp "${FRONTEND_DIR}/build"
+fi
 
 # 5. Restart Layanan via Systemd
 echo "🔄 Merestart service systemd..."
