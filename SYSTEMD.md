@@ -17,6 +17,7 @@ Dokumen ini adalah panduan resmi untuk men-deploy dan mengelola layanan backend 
    - [C. Berkas Environment Frontend (`/etc/erp/erp-frontend.env`)](#c-berkas-environment-frontend)
    - [D. Berkas Unit Systemd Frontend (`erp-frontend.service`)](#d-berkas-unit-systemd-frontend)
    - [E. Integrasi Alur Penerimaan Hasil Build dari GitHub Actions](#e-integrasi-alur-penerimaan-hasil-build-dari-github-actions)
+   - [F. Langkah Persiapan Server Sebelum Deployment Pertama](#f-langkah-persiapan-server-sebelum-deployment-pertama)
 5. [Manajemen Terpadu dengan Systemd Target (`erp.target`)](#5-manajemen-terpadu-dengan-systemd-target)
 6. [Integrasi Reverse Proxy (Nginx)](#6-integrasi-reverse-proxy-nginx)
 7. [Skrip Otomasi Deployment (`deploy.sh`)](#7-skrip-otomasi-deployment)
@@ -477,6 +478,108 @@ curl -fs http://127.0.0.1:3000 > /dev/null || {
 
 echo "✅ Frontend berhasil diperbarui dari build GitHub Actions di /opt/apps/erp_monolith/frontend dan aktif."
 ```
+
+### F. Langkah Persiapan Server Sebelum Deployment Pertama
+
+> ⚠️ **PERINGATAN PENTING:**  
+> Karena hasil build frontend-nya belum ada, **JANGAN jalankan `systemctl start` sekarang**, karena pasti akan langsung gagal (*error: file not found / 203 EXEC*).
+
+Berikut langkah-langkah yang harus dilakukan untuk mempersiapkan server sebelum deployment pertama:
+
+#### 1. Pastikan User `erp` Sudah Ada di VPS
+Pada service Anda tertulis `User=erp` dan `Group=erp`. Pastikan user sistem `erp` sudah dibuat:
+
+```bash
+# Cek apakah user erp sudah ada
+id erp
+
+# Jika belum ada, buat user sistem khusus (tanpa akses login shell):
+sudo useradd -r -s /bin/false erp
+```
+
+#### 2. Buat Folder Tujuan & Atur Izin Akses
+Folder `/opt/apps/erp_monolith/frontend` harus ada dan bisa ditulisi oleh user `deployer` (yang melakukan rsync dari GitHub Actions), serta bisa dibaca oleh user `erp`:
+
+```bash
+# Buat direktori tujuan
+sudo mkdir -p /opt/apps/erp_monolith/frontend
+
+# Berikan kepemilikan ke user deployer, dengan grup erp
+sudo chown -R deployer:erp /opt/apps/erp_monolith/frontend
+
+# Beri permission: deployer bisa tulis, user erp bisa membaca dan mengeksekusi
+sudo chmod -R 755 /opt/apps/erp_monolith/frontend
+```
+
+#### 3. Pastikan File Environment Sudah Dibuat
+Service membutuhkan `EnvironmentFile=/etc/erp/erp-frontend.env`. Jika file ini belum ada, systemd akan menolak jalan:
+
+```bash
+# Buat folder dan filenya jika belum ada
+sudo mkdir -p /etc/erp
+sudo nano /etc/erp/erp-frontend.env
+```
+
+Isi variabel minimal (sesuai kebutuhan SvelteKit), misalnya:
+
+```env
+NODE_ENV=production
+PORT=3000
+HOST=127.0.0.1
+ORIGIN=https://erp.domainanda.com
+```
+
+Kunci hak aksesnya agar user `erp` bisa membaca file ini:
+
+```bash
+sudo chown root:erp /etc/erp/erp-frontend.env
+sudo chmod 640 /etc/erp/erp-frontend.env
+```
+
+#### 4. Cek Path Node.js
+Pastikan path Node.js di server sama dengan `ExecStart=/usr/bin/node ...`:
+
+```bash
+which node
+```
+
+- Jika outputnya `/usr/bin/node`, berarti sudah sesuai.
+- Jika outputnya lain (misal `/usr/local/bin/node`): sesuaikan path tersebut di file `.service` Anda.
+
+#### 5. Daftarkan Service ke Systemd (daemon-reload & enable)
+Jangan di-start sekarang, cukup reload dan enable agar service terdaftar di sistem:
+
+```bash
+# Muat ulang konfigurasi systemd
+sudo systemctl daemon-reload
+
+# Aktifkan agar service otomatis jalan tiap kali VPS restart
+sudo systemctl enable erp-frontend.service
+```
+
+#### 6. Cek File Workflow GitHub Actions Anda
+Perhatikan di file workflow GitHub Actions Anda (`Untitled-1` / `deploy.yml`), perintah restart saat ini masih dikomentari (`#`):
+
+```yaml
+# sudo systemctl restart erp-frontend.service
+```
+
+Buka komentar (*uncomment*) baris tersebut menjadi:
+
+```yaml
+sudo systemctl restart erp-frontend.service
+sudo systemctl is-active erp-frontend.service
+```
+
+#### 7. Jalankan Deployment Pertama! 🚀
+Sekarang server sudah siap menerima file:
+
+1. Lakukan `git push` ke repository Anda untuk men-trigger GitHub Actions.
+2. GitHub Actions akan:
+   - Menjalankan `build-frontend`.
+   - Mengirim folder hasil build ke `/opt/apps/erp_monolith/frontend/` melalui rsync.
+   - Menjalankan `sudo systemctl restart erp-frontend.service`.
+3. Setelah file masuk, barulah systemd otomatis menyalakan aplikasi frontend SvelteKit Anda!
 
 ---
 
