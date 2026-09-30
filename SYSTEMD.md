@@ -403,8 +403,8 @@ Ketika GitHub Actions mentransfer berkas menggunakan akun SSH `deployer` (yang t
   sudo chown -R erp:erp /opt/apps/erp_monolith/frontend
   ```
 
-#### 3. Konfigurasi Unit Systemd Frontend Khusus Hasil Build GitHub (`erp-frontend.service`)
-Berikut adalah berkas unit `/etc/systemd/system/erp-frontend.service` yang dirancang khusus untuk mengeksekusi hasil build yang diterima dari GitHub Actions di `/opt/apps/erp_monolith/frontend`:
+#### 3. Konfigurasi Unit Systemd Frontend Khusus Hasil Build GitHub (`erp-monolith-frontend.service`)
+Berikut adalah berkas unit `/etc/systemd/system/erp-monolith-frontend.service` (dengan alias/symlink `erp-frontend.service`) yang dirancang khusus untuk mengeksekusi hasil build yang diterima dari GitHub Actions di `/opt/apps/erp_monolith/frontend`:
 
 ```ini
 [Unit]
@@ -593,8 +593,11 @@ Jangan di-start sekarang, cukup reload dan enable agar service terdaftar di sist
 sudo systemctl daemon-reload
 
 # Aktifkan agar service otomatis jalan tiap kali VPS restart
-sudo systemctl enable erp-frontend.service
+sudo systemctl enable erp-monolith-frontend.service
 ```
+
+> 💡 **Catatan Unit Systemd:**  
+> Pastikan meng-enable file unit `.service` (`erp-monolith-frontend.service`), bukan file environment (`.env`). File konfigurasi environment (`/etc/erp_monolith/erp-monolith-frontend.env`) dimuat secara otomatis oleh systemd melalui direktif `EnvironmentFile` di dalam berkas unit.
 
 #### 6. Cek File Workflow GitHub Actions Anda
 Perhatikan di file workflow GitHub Actions Anda (`Untitled-1` / `deploy.yml`), perintah restart saat ini masih dikomentari (`#`):
@@ -647,7 +650,7 @@ sudo systemctl daemon-reload
 
 # 2. Aktifkan auto-start saat boot sistem
 sudo systemctl enable erp-backend.service
-sudo systemctl enable erp-frontend.service
+sudo systemctl enable erp-monolith-frontend.service
 sudo systemctl enable erp.target
 
 # 3. Nyalakan seluruh stack aplikasi
