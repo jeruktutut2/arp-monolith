@@ -144,19 +144,20 @@ Pastikan direktori aplikasi di VPS sudah dibuat dan user `deployer` memiliki hak
 # 1. Buat hierarki folder
 sudo mkdir -p /opt/dev/erp_monolith/backend/bin
 sudo mkdir -p /opt/dev/erp_monolith/backend/migrations
-sudo mkdir -p /opt/erp_monolith/frontend
+sudo mkdir -p /opt/apps/erp_monolith/frontend
 sudo mkdir -p /etc/erp
 
 # 2. Berikan izin kepemilikan ke deployer:erp
 sudo chown -R deployer:erp /opt/dev/erp_monolith
-sudo chown -R deployer:erp /opt/erp_monolith
+sudo chown -R deployer:erp /opt/apps
 sudo chown -R deployer:erp /etc/erp
 sudo chmod -R 775 /opt/dev/erp_monolith
-sudo chmod -R 775 /opt/erp_monolith
+sudo chmod -R 775 /opt/apps
 sudo chmod 750 /etc/erp
 
 # 3. SetGID bit agar setiap file baru otomatis memiliki group 'erp'
 sudo find /opt/dev/erp_monolith -type d -exec chmod g+s {} +
+sudo find /opt/apps -type d -exec chmod g+s {} +
 ```
 
 ---
@@ -407,7 +408,7 @@ jobs:
           rsync -avz -e "ssh -p $PORT" --delete backend/migrations/ $USER@$HOST:/opt/dev/erp_monolith/backend/migrations/
 
           # 3. Kirim folder build frontend
-          rsync -avz -e "ssh -p $PORT" --delete frontend-dist/ $USER@$HOST:/opt/erp_monolith/frontend/
+          rsync -avz -e "ssh -p $PORT" --delete frontend-dist/ $USER@$HOST:/opt/apps/erp_monolith/frontend/
 
       - name: ⚡ Execute Deployment Commands on Remote VPS
         uses: appleboy/ssh-action@v1.0.3

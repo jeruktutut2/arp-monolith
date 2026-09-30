@@ -90,9 +90,9 @@ sudo chmod 750 /etc/erp
 
 # Direktori target rilis jika menggunakan path terpisah (atau gunakan direktori workspace aktif)
 sudo mkdir -p /opt/dev/erp_monolith/backend/bin
-sudo mkdir -p /opt/erp_monolith/frontend
+sudo mkdir -p /opt/apps/erp_monolith/frontend
 sudo chown -R erp:erp /opt/dev/erp_monolith
-sudo chown -R erp:erp /opt/erp_monolith
+sudo chown -R erp:erp /opt/apps
 ```
 
 ---
@@ -261,7 +261,7 @@ sudo chown -R erp:erp /opt/dev/erp_monolith/frontend
 Hasil build akan tersimpan di direktori `/opt/dev/erp_monolith/frontend/build`.
 
 > 💡 **Build di VPS vs Menerima Build dari GitHub Actions (CI/CD):**
-> Perintah di atas digunakan jika Anda memilih melakukan build lokal langsung di VPS. Namun, pada alur CI/CD produksi yang direkomendasikan ([GITHUB_ACTIONS.md](file:///opt/dev/erp_monolith/GITHUB_ACTIONS.md)), proses `bun run build` dijalankan di GitHub Actions runner. VPS hanya menerima hasil kompilasi folder `frontend/build/` yang ditaruh ke direktori target `/opt/erp_monolith/frontend/` via SSH/Rsync sehingga server terbebas dari lonjakan RAM/CPU saat proses build. Lihat detail penerimaan dan konfigurasinya di [Sub-bab E](#e-integrasi-alur-penerimaan-hasil-build-dari-github-actions).
+> Perintah di atas digunakan jika Anda memilih melakukan build lokal langsung di VPS. Namun, pada alur CI/CD produksi yang direkomendasikan ([GITHUB_ACTIONS.md](file:///opt/dev/erp_monolith/GITHUB_ACTIONS.md)), proses `bun run build` dijalankan di GitHub Actions runner. VPS hanya menerima hasil kompilasi folder `frontend/build/` yang ditaruh ke direktori target `/opt/apps/erp_monolith/frontend/` via SSH/Rsync sehingga server terbebas dari lonjakan RAM/CPU saat proses build. Lihat detail penerimaan dan konfigurasinya di [Sub-bab E](#e-integrasi-alur-penerimaan-hasil-build-dari-github-actions).
 
 ### C. Berkas Environment Frontend
 Buat berkas konfigurasi di `/etc/erp/erp-frontend.env`:
@@ -363,11 +363,11 @@ Jika Anda menerapkan alur pengiriman otomatis menggunakan **GitHub Actions** (se
 - **Build di GitHub Actions Runner**: Runner GitHub mengompilasi SvelteKit 2 menggunakan Bun (`bun install --frozen-lockfile` & `bun run build`) menghasilkan artefak rilis di folder `frontend/build/`.
 - **Pengiriman Tanpa Source Code Mentah**: Hanya direktori hasil build terkompilasi yang dikirimkan ke server VPS via SSH/Rsync ke path target produksi:
   ```text
-  /opt/erp_monolith/frontend/
+  /opt/apps/erp_monolith/frontend/
   ```
 - **Struktur Berkas di VPS**:
   ```text
-  /opt/erp_monolith/frontend/
+  /opt/apps/erp_monolith/frontend/
   ├── index.js          # Entrypoint server (Polka / Node HTTP)
   ├── handler.js        # Request handler SvelteKit
   ├── env.js            # Injeksi runtime environment variable
@@ -380,30 +380,30 @@ Jika Anda menerapkan alur pengiriman otomatis menggunakan **GitHub Actions** (se
 #### 2. Penanganan Hak Akses & Kepemilikan (User `deployer` vs `erp`)
 Ketika GitHub Actions mentransfer berkas menggunakan akun SSH `deployer` (yang tergabung dalam grup `erp`), berkas build baru akan tercatat sebagai milik `deployer:erp`. Agar service Systemd yang dijalankan oleh user `erp` dapat mengakses dan membaca hasil build:
 
-- **Langkah 1 — Terapkan Flag SetGID pada Direktori `/opt/erp_monolith/frontend` di VPS:**
+- **Langkah 1 — Terapkan Flag SetGID pada Direktori `/opt/apps/erp_monolith/frontend` di VPS:**
   Jalankan perintah ini satu kali di server VPS:
   ```bash
   # Pastikan direktori tujuan frontend ada
-  sudo mkdir -p /opt/erp_monolith/frontend
+  sudo mkdir -p /opt/apps/erp_monolith/frontend
 
   # Tetapkan kepemilikan deployer dan grup erp
-  sudo chown -R deployer:erp /opt/erp_monolith/frontend
+  sudo chown -R deployer:erp /opt/apps/erp_monolith/frontend
 
   # Berikan izin baca-tulis-eksekusi untuk pemilik dan grup
-  sudo chmod -R 775 /opt/erp_monolith/frontend
+  sudo chmod -R 775 /opt/apps/erp_monolith/frontend
 
   # Aktifkan SetGID agar file baru dari rsync otomatis mewarisi grup 'erp'
-  sudo chmod g+s /opt/erp_monolith/frontend
+  sudo chmod g+s /opt/apps/erp_monolith/frontend
   ```
 
 - **Langkah 2 — Penyesuaian Izin Pasca Sinkronisasi:**
   Jika tidak menggunakan SetGID, tambahkan perintah `chown` di blok script deployment GitHub Actions atau skrip transfer:
   ```bash
-  sudo chown -R erp:erp /opt/erp_monolith/frontend
+  sudo chown -R erp:erp /opt/apps/erp_monolith/frontend
   ```
 
 #### 3. Konfigurasi Unit Systemd Frontend Khusus Hasil Build GitHub (`erp-frontend.service`)
-Berikut adalah berkas unit `/etc/systemd/system/erp-frontend.service` yang dirancang khusus untuk mengeksekusi hasil build yang diterima dari GitHub Actions di `/opt/erp_monolith/frontend`:
+Berikut adalah berkas unit `/etc/systemd/system/erp-frontend.service` yang dirancang khusus untuk mengeksekusi hasil build yang diterima dari GitHub Actions di `/opt/apps/erp_monolith/frontend`:
 
 ```ini
 [Unit]
@@ -418,13 +418,13 @@ User=erp
 Group=erp
 
 # Direktori kerja frontend (lokasi hasil build dari GitHub Actions)
-WorkingDirectory=/opt/erp_monolith/frontend
+WorkingDirectory=/opt/apps/erp_monolith/frontend
 
 # File environment produksi (memuat PORT=3000, HOST=127.0.0.1, ORIGIN, dll.)
 EnvironmentFile=/etc/erp/erp-frontend.env
 
-# Eksekusi entrypoint hasil build yang ditaruh di /opt/erp_monolith/frontend
-ExecStart=/usr/bin/node /opt/erp_monolith/frontend/index.js
+# Eksekusi entrypoint hasil build yang ditaruh di /opt/apps/erp_monolith/frontend
+ExecStart=/usr/bin/node /opt/apps/erp_monolith/frontend/index.js
 
 # Siklus Hidup & Restart Otomatis
 Restart=always
@@ -454,15 +454,15 @@ WantedBy=multi-user.target
 > 💡 **Opsi Alternatif Runtime Bun:**
 > Jika Anda menggunakan runtime Bun di VPS, cukup sesuaikan baris `ExecStart`:
 > ```ini
-> ExecStart=/usr/local/bin/bun /opt/erp_monolith/frontend/index.js
+> ExecStart=/usr/local/bin/bun /opt/apps/erp_monolith/frontend/index.js
 > ```
 
 #### 4. Alur Restart & Health Check Pasca Penerimaan Build
-Setelah step transfer Rsync selesai memindahkan file build ke `/opt/erp_monolith/frontend/`, skrip GitHub Actions akan mengeksekusi perintah reload & restart berikut melalui SSH:
+Setelah step transfer Rsync selesai memindahkan file build ke `/opt/apps/erp_monolith/frontend/`, skrip GitHub Actions akan mengeksekusi perintah reload & restart berikut melalui SSH:
 
 ```bash
 # 1. Pastikan berkas entrypoint index.js dapat dibaca
-test -f /opt/erp_monolith/frontend/index.js || { echo "❌ /opt/erp_monolith/frontend/index.js tidak ditemukan!"; exit 1; }
+test -f /opt/apps/erp_monolith/frontend/index.js || { echo "❌ /opt/apps/erp_monolith/frontend/index.js tidak ditemukan!"; exit 1; }
 
 # 2. Restart unit service frontend secara graceful
 sudo systemctl restart erp-frontend.service
@@ -475,7 +475,7 @@ curl -fs http://127.0.0.1:3000 > /dev/null || {
   exit 1
 }
 
-echo "✅ Frontend berhasil diperbarui dari build GitHub Actions di /opt/erp_monolith/frontend dan aktif."
+echo "✅ Frontend berhasil diperbarui dari build GitHub Actions di /opt/apps/erp_monolith/frontend dan aktif."
 ```
 
 ---
@@ -667,23 +667,23 @@ mv -f bin/erp-backend.new bin/erp-backend
 chown erp:erp bin/erp-backend
 
 # 4. Kompilasi / Penyiapan Frontend SvelteKit
-# Catatan: Jika menggunakan GitHub Actions, hasil build langsung disinkronkan ke /opt/erp_monolith/frontend
-if [ -f "/opt/erp_monolith/frontend/index.js" ]; then
-    echo "🎨 Build frontend di /opt/erp_monolith/frontend terdeteksi, memastikan hak akses..."
-    chown -R erp:erp /opt/erp_monolith/frontend
+# Catatan: Jika menggunakan GitHub Actions, hasil build langsung disinkronkan ke /opt/apps/erp_monolith/frontend
+if [ -f "/opt/apps/erp_monolith/frontend/index.js" ]; then
+    echo "🎨 Build frontend di /opt/apps/erp_monolith/frontend terdeteksi, memastikan hak akses..."
+    chown -R erp:erp /opt/apps/erp_monolith/frontend
 elif [ -f "${FRONTEND_DIR}/build/index.js" ]; then
-    echo "🎨 Build frontend lokal terdeteksi, menyalin ke /opt/erp_monolith/frontend..."
-    mkdir -p /opt/erp_monolith/frontend
-    cp -r "${FRONTEND_DIR}/build/"* /opt/erp_monolith/frontend/
-    chown -R erp:erp /opt/erp_monolith/frontend
+    echo "🎨 Build frontend lokal terdeteksi, menyalin ke /opt/apps/erp_monolith/frontend..."
+    mkdir -p /opt/apps/erp_monolith/frontend
+    cp -r "${FRONTEND_DIR}/build/"* /opt/apps/erp_monolith/frontend/
+    chown -R erp:erp /opt/apps/erp_monolith/frontend
 else
     echo "🎨 Melakukan kompilasi frontend SvelteKit secara lokal..."
     cd "${FRONTEND_DIR}"
     bun install --frozen-lockfile
     bun run build
-    mkdir -p /opt/erp_monolith/frontend
-    cp -r build/* /opt/erp_monolith/frontend/
-    chown -R erp:erp /opt/erp_monolith/frontend
+    mkdir -p /opt/apps/erp_monolith/frontend
+    cp -r build/* /opt/apps/erp_monolith/frontend/
+    chown -R erp:erp /opt/apps/erp_monolith/frontend
 fi
 
 # 5. Restart Layanan via Systemd
