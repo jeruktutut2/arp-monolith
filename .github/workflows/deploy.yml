@@ -1,0 +1,81 @@
+name: 🚀 Build & Deploy to Production VPS
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch: # Memungkinkan trigger manual dari UI GitHub
+
+# Cegah concurrent deployment agar tidak saling tumpang tindih
+concurrency:
+  group: production_deployment
+  cancel-in-progress: false
+
+jobs:
+  # ========================================================
+  # JOB 1: Test & Build Backend Golang
+  # ========================================================
+  build-backend:
+    name: 🔨 Build Go Backend
+    runs-on: ubuntu-latest
+    steps:
+      - name: 📥 Checkout Code
+        uses: actions/checkout@v4
+
+      - name: 🐹 Setup Go 1.22+
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.22'
+          check-latest: true
+          cache-dependency-path: backend/go.sum
+
+      - name: 🧪 Run Backend Tests
+        run: |
+          cd backend
+          go test -v ./...
+
+      - name: 📦 Compile Go Binary (Linux AMD64)
+        run: |
+          cd backend
+          CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -ldflags="-s -w" -o bin/erp-backend cmd/server/main.go
+
+      - name: 📤 Upload Backend Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: backend-binary
+          path: backend/bin/erp-backend
+          retention-days: 1
+
+  # ========================================================
+  # JOB 2: Build Frontend SvelteKit 2 (Bun)
+  # ========================================================
+  build-frontend:
+    name: 🎨 Build SvelteKit Frontend
+    runs-on: ubuntu-latest
+    steps:
+      - name: 📥 Checkout Code
+        uses: actions/checkout@v4
+
+      - name: 🥟 Setup Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+
+      - name: 📦 Install Frontend Dependencies & Build
+        run: |
+          if [ -d "frontend" ]; then
+            cd frontend
+            bun install --frozen-lockfile
+            bun run build
+          else
+            echo "Direktori frontend belum dibuat, membuat placeholder dist."
+            mkdir -p frontend/build
+            echo "Placeholder frontend" > frontend/build/index.js
+          fi
+
+      - name: 📤 Upload Frontend Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: frontend-build
+          path: frontend/build/
+          retention-days: 1
