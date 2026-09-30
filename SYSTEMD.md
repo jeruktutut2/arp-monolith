@@ -603,14 +603,14 @@ sudo systemctl enable erp-monolith-frontend.service
 Perhatikan di file workflow GitHub Actions Anda (`Untitled-1` / `deploy.yml`), perintah restart saat ini masih dikomentari (`#`):
 
 ```yaml
-# sudo systemctl restart erp-frontend.service
+# sudo systemctl restart erp-monolith-frontend.service
 ```
 
 Buka komentar (*uncomment*) baris tersebut menjadi:
 
 ```yaml
-sudo systemctl restart erp-frontend.service
-sudo systemctl is-active erp-frontend.service
+sudo systemctl restart erp-monolith-frontend.service
+sudo systemctl is-active erp-monolith-frontend.service
 ```
 
 #### 7. Jalankan Deployment Pertama! 🚀
@@ -620,7 +620,7 @@ Sekarang server sudah siap menerima file:
 2. GitHub Actions akan:
    - Menjalankan `build-frontend`.
    - Mengirim folder hasil build ke `/opt/apps/erp_monolith/frontend/` melalui rsync.
-   - Menjalankan `sudo systemctl restart erp-frontend.service`.
+   - Menjalankan `sudo systemctl restart erp-monolith-frontend.service`.
 3. Setelah file masuk, barulah systemd otomatis menyalakan aplikasi frontend SvelteKit Anda!
 
 ---
