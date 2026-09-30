@@ -79,3 +79,88 @@ jobs:
           name: frontend-build
           path: frontend/build/
           retention-days: 1
+
+  # ========================================================
+  # JOB 3: Deploy Artifacts & Restart Services on VPS
+  # ========================================================
+  deploy:
+    name: 🚀 Deploy to VPS
+    needs: [build-backend, build-frontend]
+    runs-on: ubuntu-latest
+    steps:
+      - name: 📥 Checkout Migrations & Scripts
+        uses: actions/checkout@v4
+
+      - name: 📥 Download Backend Artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: backend-binary
+          path: backend-dist
+
+      - name: 📥 Download Frontend Artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: frontend-build
+          path: frontend-dist
+
+      - name: 🔑 Configure SSH Key
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.VPS_SSH_KEY }}" > ~/.ssh/id_ed25519
+          chmod 600 ~/.ssh/id_ed25519
+          ssh-keyscan -p ${{ secrets.VPS_PORT || 22 }} ${{ secrets.VPS_HOST }} >> ~/.ssh/known_hosts
+
+      - name: 🚚 Transfer Artifacts to VPS via Rsync
+        env:
+          PORT: ${{ secrets.VPS_PORT || 22 }}
+          USER: ${{ secrets.VPS_USER }}
+          HOST: ${{ secrets.VPS_HOST }}
+        run: |
+          # 1. Kirim binary baru backend ke file temporary .new
+          # scp -P $PORT backend-dist/erp-backend $USER@$HOST:/opt/dev/erp_monolith/backend/bin/erp-backend.new
+          
+          # 2. Kirim migrasi database
+          # rsync -avz -e "ssh -p $PORT" --delete backend/migrations/ $USER@$HOST:/opt/dev/erp_monolith/backend/migrations/
+
+          # 3. Kirim folder build frontend
+          rsync -avz -e "ssh -p $PORT" --delete frontend-dist/ $USER@$HOST:/opt/apps/erp_monolith/frontend/
+
+      - name: ⚡ Execute Deployment Commands on Remote VPS
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.VPS_HOST }}
+          username: ${{ secrets.VPS_USER }}
+          key: ${{ secrets.VPS_SSH_KEY }}
+          port: ${{ secrets.VPS_PORT || 22 }}
+          script: |
+            set -e
+            #echo "--- [1/5] Menjalankan Migrasi Database ---"
+            #if command -v migrate >/dev/null 2>&1; then
+            #  migrate -path /opt/dev/erp_monolith/backend/migrations \
+            #    -database "${{ secrets.DIRECT_DATABASE_URL }}" up || echo "Migrasi up selesai."
+            #fi
+
+            #echo "--- [2/5] Atomic Swap Binary Golang ---"
+            #chmod +x /opt/dev/erp_monolith/backend/bin/erp-backend.new
+            #mv -f /opt/dev/erp_monolith/backend/bin/erp-backend.new /opt/dev/erp_monolith/backend/bin/erp-backend
+
+            #echo "--- [3/5] Restart Layanan Systemd ---"
+            #sudo systemctl restart erp-backend.service
+            #sudo systemctl restart erp-frontend.service
+
+            #echo "--- [4/5] Verifikasi Health Check ---"
+            #sleep 3
+            #curl -fs http://127.0.0.1:8080/health || {
+            #  echo "❌ Backend Health Check GAGAL!"
+            #  sudo systemctl status erp-backend.service --no-pager
+            #  exit 1
+            #}
+
+            #echo "✅ Health check Backend Berhasil (HTTP 200 OK)."
+
+            #echo "--- [5/5] Status Akhir Layanan ---"
+            #sudo systemctl is-active erp-backend.service
+            #sudo systemctl is-active erp-frontend.service
+            sudo systemctl is-active erp-monolith-frontend.service
+            echo "🎉 Deployment Sukses!"
+
