@@ -387,8 +387,8 @@ Ketika GitHub Actions mentransfer berkas menggunakan akun SSH `deployer` (yang t
   # Pastikan direktori tujuan frontend ada
   sudo mkdir -p /opt/apps/erp_monolith/frontend
 
-  # Tetapkan kepemilikan deployer dan grup erp
-  sudo chown -R deployer:erp /opt/apps/erp_monolith/frontend
+  # Tetapkan kepemilikan deployer dan grup deployer
+  sudo chown -R deployer:deployer /opt/apps/erp_monolith/frontend
 
   # Berikan izin baca-tulis-eksekusi untuk pemilik dan grup
   sudo chmod -R 775 /opt/apps/erp_monolith/frontend
@@ -422,10 +422,10 @@ Group=erp
 WorkingDirectory=/opt/apps/erp_monolith/frontend
 
 # File environment produksi (memuat PORT=3000, HOST=127.0.0.1, ORIGIN, dll.)
-EnvironmentFile=/etc/erp/erp-frontend.env
+EnvironmentFile=/etc/erp_monolith/erp-monolith-frontend.env
 
 # Eksekusi entrypoint hasil build yang ditaruh di /opt/apps/erp_monolith/frontend
-ExecStart=/usr/bin/node /opt/apps/erp_monolith/frontend/index.js
+ExecStart=/usr/local/bin/bun /opt/apps/erp_monolith/frontend/index.js
 
 # Siklus Hidup & Restart Otomatis
 Restart=always
@@ -452,11 +452,41 @@ SyslogIdentifier=erp-frontend
 WantedBy=multi-user.target
 ```
 
-> 💡 **Opsi Alternatif Runtime Bun:**
-> Jika Anda menggunakan runtime Bun di VPS, cukup sesuaikan baris `ExecStart`:
+> 📌 **Catatan Penting Penggunaan Bun di Systemd:**  
+> Saat ini **BELUM BENAR**, karena file fisiknya masih berada di `/home/deployer/.bun/bin/bun`, sedangkan di `/usr/local/bin/bun` filenya belum ada. Jika dijalankan sekarang, systemd akan error: `No such file or directory`.
+> 
+> ⚠️ **Jangan Langsung Ganti ke `/home/deployer/.bun/bin/bun`!**  
+> Anda mungkin berpikir untuk mengubahnya menjadi:
 > ```ini
-> ExecStart=/usr/local/bin/bun /opt/apps/erp_monolith/frontend/index.js
+> ExecStart=/home/deployer/.bun/bin/bun ...   <-- JANGAN LAKUKAN INI
 > ```
+> Mengapa? Karena di file systemd Anda terdapat pengaturan keamanan ini:
+> ```ini
+> ProtectHome=true
+> ```
+> Fitur `ProtectHome=true` akan memblokir total akses ke folder `/home/`. Jika file bun ditaruh di `/home/deployer/`, systemd tidak akan bisa menjalankannya.
+> 
+> **Solusi yang Benar & Paling Aman:**  
+> Salin (*copy*) file binary bun langsung ke direktori sistem `/usr/local/bin/`:
+> ```bash
+> # 1. Salin binary bun ke folder sistem
+> sudo cp /home/deployer/.bun/bin/bun /usr/local/bin/bun
+> # 2. Berikan izin eksekusi
+> sudo chmod 755 /usr/local/bin/bun
+> # 3. Verifikasi apakah sudah bisa dipanggil dari direktori sistem
+> /usr/local/bin/bun -v
+> ```
+> 
+> **Hasil Akhir:**  
+> Setelah menjalankan 2 perintah di atas:
+> - Perintah `which bun` nantinya akan mengenali `/usr/local/bin/bun`.
+> - Baris konfigurasi Anda di systemd:
+>   ```ini
+>   ExecStart=/usr/local/bin/bun /opt/apps/erp_monolith/frontend/index.js
+>   ```
+>   sudah **100% BENAR**, aman dari blokiran `ProtectHome`, dan siap digunakan!
+> 
+> *(Catatan: Jika Anda memilih runtime Node.js alih-alih Bun, gunakan `ExecStart=/usr/bin/node /opt/apps/erp_monolith/frontend/index.js`)*.
 
 #### 4. Alur Restart & Health Check Pasca Penerimaan Build
 Setelah step transfer Rsync selesai memindahkan file build ke `/opt/apps/erp_monolith/frontend/`, skrip GitHub Actions akan mengeksekusi perintah reload & restart berikut melalui SSH:
@@ -504,20 +534,20 @@ Folder `/opt/apps/erp_monolith/frontend` harus ada dan bisa ditulisi oleh user `
 # Buat direktori tujuan
 sudo mkdir -p /opt/apps/erp_monolith/frontend
 
-# Berikan kepemilikan ke user deployer, dengan grup erp
-sudo chown -R deployer:erp /opt/apps/erp_monolith/frontend
+# Berikan kepemilikan ke user deployer, dengan grup deployer
+sudo chown -R deployer:deployer /opt/apps/erp_monolith/frontend
 
 # Beri permission: deployer bisa tulis, user erp bisa membaca dan mengeksekusi
 sudo chmod -R 755 /opt/apps/erp_monolith/frontend
 ```
 
 #### 3. Pastikan File Environment Sudah Dibuat
-Service membutuhkan `EnvironmentFile=/etc/erp/erp-frontend.env`. Jika file ini belum ada, systemd akan menolak jalan:
+Service membutuhkan `EnvironmentFile=/etc/erp_monolith/erp-monolith-frontend.env`. Jika file ini belum ada, systemd akan menolak jalan:
 
 ```bash
 # Buat folder dan filenya jika belum ada
-sudo mkdir -p /etc/erp
-sudo nano /etc/erp/erp-frontend.env
+sudo mkdir -p /etc/erp_monolith
+sudo nano /etc/erp_monolith/erp-monolith-frontend.env
 ```
 
 Isi variabel minimal (sesuai kebutuhan SvelteKit), misalnya:
@@ -529,22 +559,31 @@ HOST=127.0.0.1
 ORIGIN=https://erp.domainanda.com
 ```
 
-Kunci hak aksesnya agar user `erp` bisa membaca file ini:
+Kunci hak aksesnya agar user `deployer` / `erp` bisa membaca file ini:
 
 ```bash
-sudo chown root:erp /etc/erp/erp-frontend.env
-sudo chmod 640 /etc/erp/erp-frontend.env
+sudo chown root:deployer /etc/erp_monolith/erp-monolith-frontend.env
+sudo chmod 640 /etc/erp_monolith/erp-monolith-frontend.env
 ```
 
-#### 4. Cek Path Node.js
-Pastikan path Node.js di server sama dengan `ExecStart=/usr/bin/node ...`:
+#### 4. Cek Path Bun atau Node.js
+Pastikan binary runtime tersedia di path sistem:
 
-```bash
-which node
-```
-
-- Jika outputnya `/usr/bin/node`, berarti sudah sesuai.
-- Jika outputnya lain (misal `/usr/local/bin/node`): sesuaikan path tersebut di file `.service` Anda.
+- **Jika Menggunakan Bun (Sesuai Konfigurasi Utama):**
+  Pastikan binary bun sudah disalin ke `/usr/local/bin/bun` agar aman dari proteksi `ProtectHome=true`:
+  ```bash
+  # 1. Salin binary bun ke folder sistem
+  sudo cp /home/deployer/.bun/bin/bun /usr/local/bin/bun
+  # 2. Berikan izin eksekusi
+  sudo chmod 755 /usr/local/bin/bun
+  # 3. Verifikasi ketersediaan bun di sistem
+  /usr/local/bin/bun -v
+  ```
+- **Jika Menggunakan Node.js:**
+  ```bash
+  which node
+  ```
+  Jika outputnya `/usr/bin/node`, pastikan `ExecStart=/usr/bin/node ...` pada berkas service.
 
 #### 5. Daftarkan Service ke Systemd (daemon-reload & enable)
 Jangan di-start sekarang, cukup reload dan enable agar service terdaftar di sistem:
@@ -874,7 +913,7 @@ sudo systemctl restart systemd-journald
 ### 1. SvelteKit CSRF Error: `Cross-site POST form submissions are forbidden`
 - **Penyebab:** SvelteKit 2 memeriksa header `Origin` saat menerima form submission POST. Jika reverse proxy tidak mengirimkan header yang cocok dengan `ORIGIN`, request akan ditolak (status 403).
 - **Solusi:** 
-  1. Pastikan pada `/etc/erp/erp-frontend.env`:
+  1. Pastikan pada `/etc/erp_monolith/erp-monolith-frontend.env`:
      ```ini
      ORIGIN=https://erp.perusahaan.com
      ```
@@ -889,7 +928,7 @@ sudo systemctl restart systemd-journald
 ### 2. Request Entity Too Large (Status 413) saat Upload File
 - **Penyebab:** Batas default SvelteKit adalah 512KB dan Nginx adalah 1MB.
 - **Solusi:**
-  1. Pada SvelteKit (`/etc/erp/erp-frontend.env`):
+  1. Pada SvelteKit (`/etc/erp_monolith/erp-monolith-frontend.env`):
      ```ini
      BODY_SIZE_LIMIT=52428800 # 50MB dalam bytes
      ```
@@ -912,13 +951,19 @@ sudo systemctl restart systemd-journald
 ---
 
 ### 4. Eksekusi Node atau Bun Gagal: `code=exited, status=203/EXEC`
-- **Penyebab:** Path binary Node.js atau Bun di direktori `/usr/local/bin` atau nvm tidak ditemukan oleh systemd. Systemd tidak memuat file profile shell (`.bashrc` / `.zshrc`).
-- **Solusi:** Periksa lokasi absolut binary dengan:
-  ```bash
-  which node
-  which bun
-  ```
-  Gunakan path absolut lengkap tersebut pada direktif `ExecStart` di berkas `.service`.
+- **Penyebab:** Path binary Node.js atau Bun di direktori `/usr/local/bin` belum ada/tidak ditemukan oleh systemd, atau binary Bun ditaruh di `/home/deployer/.bun/bin/bun` yang diblokir oleh `ProtectHome=true`.
+- **Solusi:** 
+  1. Untuk Bun, salin binary ke folder sistem:
+     ```bash
+     sudo cp /home/deployer/.bun/bin/bun /usr/local/bin/bun
+     sudo chmod 755 /usr/local/bin/bun
+     ```
+  2. Periksa lokasi absolut binary dengan:
+     ```bash
+     which node
+     which bun
+     ```
+     Gunakan path absolut `/usr/local/bin/bun` pada direktif `ExecStart` di berkas `.service`.
 
 ---
 
