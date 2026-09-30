@@ -77,6 +77,9 @@ Untuk alasan keamanan, **jangan pernah menjalankan aplikasi backend atau fronten
 sudo useradd -r -s /usr/sbin/nologin -d /opt/dev/erp_monolith erp
 ```
 
+> 💡 **User Service vs User Deployer:**
+> User `erp` di atas adalah akun sistem non-login khusus untuk daemon Systemd. Untuk akun operasional interaktif yang bertugas melakukan git push/pull, rsync file, restart service, dan menerima koneksi SSH dari GitHub Actions, gunakan user `deployer`. Panduan lengkap konfigurasi user `deployer` dan hak akses SSH tersedia di [SSH_GUIDE.md](file:///opt/dev/erp_monolith/SSH_GUIDE.md).
+
 ### Langkah 2: Buat Direktori Konfigurasi & Log
 ```bash
 # Direktori untuk berkas variabel lingkungan sensitif

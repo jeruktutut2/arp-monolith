@@ -8,9 +8,12 @@ Dokumen ini adalah panduan resmi untuk merancang, mengonfigurasi, dan mengoperas
 1. [Arsitektur CI/CD & Pipeline Workflow](#1-arsitektur-cicd--pipeline-workflow)
 2. [Perbandingan 2 Strategi Deployment ke VPS](#2-perbandingan-2-strategi-deployment-ke-vps)
 3. [Konfigurasi Prasyarat di Sisi Server VPS](#3-konfigurasi-prasyarat-di-sisi-server-vps)
-   - [A. Pembuatan User Dedicated & SSH Key Deployer](#a-pembuatan-user-dedicated--ssh-key-deployer)
+   - [A. Pembuatan User Dedicated `deployer` di Ubuntu](#a-pembuatan-user-dedicated-deployer-di-ubuntu)
    - [B. Konfigurasi Sudoers Tanpa Password (`NOPASSWD`)](#b-konfigurasi-sudoers-tanpa-password-nopasswd)
-   - [C. Menyiapkan Struktur Direktori di VPS](#c-menyiapkan-struktur-direktori-di-vps)
+   - [C. Menyiapkan Struktur Direktori & SetGID di VPS](#c-menyiapkan-struktur-direktori--setgid-di-vps)
+   - [D. SSH dari Server Ubuntu ke GitHub (Push & Pull)](#d-ssh-dari-server-ubuntu-ke-github-push--pull)
+   - [E. Pembuatan & Manajemen Berkas `~/.ssh/config`](#e-pembuatan--manajemen-berkas-sshconfig)
+   - [F. SSH dari GitHub Actions Deploy ke Server Ubuntu](#f-ssh-dari-github-actions-deploy-ke-server-ubuntu)
 4. [Konfigurasi GitHub Secrets & Variables](#4-konfigurasi-github-secrets--variables)
 5. [Workflow Produksi 1: Build on Runner + Rsync (Direkomendasikan)](#5-workflow-produksi-1-build-on-runner--rsync-direkomendasikan)
 6. [Workflow Produksi 2: SSH Remote Trigger + Git Pull di VPS](#6-workflow-produksi-2-ssh-remote-trigger--git-pull-di-vps)
@@ -77,46 +80,54 @@ Diagram alur berikut mengilustrasikan proses deployment otomatis dari saat devel
 
 ## 3. Konfigurasi Prasyarat di Sisi Server VPS
 
-Sebelum GitHub Actions dapat terhubung, siapkan user khusus deployment dan hak akses SSH di VPS Anda.
+Sebelum GitHub Actions dapat terhubung dan proses deployment berjalan, siapkan user khusus deployment (`deployer`), hak akses SSH dua arah, dan konfigurasi `~/.ssh/config` di server VPS Ubuntu Anda.
 
-### A. Pembuatan User Dedicated & SSH Key Deployer
-Jangan gunakan `root` untuk deployment. Buat user `deployer` (atau gunakan user yang sudah ada seperti `ubuntu` / `erp`):
+> 📖 **Panduan Lengkap & Hardening:** Untuk panduan mendalam mengenai arsitektur kunci, hardening OpenSSH daemon, izin berkas presisi, dan troubleshooting lengkap, silakan merujuk ke [SSH_GUIDE.md](file:///opt/dev/erp_monolith/SSH_GUIDE.md).
+
+---
+
+### A. Pembuatan User Dedicated `deployer` di Ubuntu
+Jangan pernah menggunakan user `root` untuk deployment CI/CD. Buat user `deployer` yang terisolasi namun memiliki akses grup terhadap service `erp`:
 
 ```bash
-# 1. Buat user deployer di VPS
-sudo useradd -m -s /bin/bash deployer
-sudo usermod -aG erp deployer
+# 1. Pastikan grup service erp sudah ada
+sudo groupadd -f -r erp
 
-# 2. Buat pasangan kunci SSH di VPS (atau di komputer lokal Anda)
-# Jalankan sebagai user deployer:
+# 2. Buat user deployer dengan shell bash dan tambahkan ke grup erp & sudo
+sudo useradd -m -s /bin/bash -g erp -G sudo deployer
+
+# 3. Tetapkan password sementara yang kuat
+sudo passwd deployer
+
+# 4. Inisialisasi folder SSH user deployer dengan izin presisi
 sudo su - deployer
 mkdir -p ~/.ssh && chmod 700 ~/.ssh
-ssh-keygen -t ed25519 -C "github-actions-deployer" -f ~/.ssh/id_ed25519 -N ""
-
-# 3. Masukkan public key ke authorized_keys
-cat ~/.ssh/id_ed25519.pub >> ~/.ssh/authorized_keys
-chmod 600 ~/.ssh/authorized_keys
-
-# 4. Tampilkan Private Key untuk disalin ke GitHub Secret
-cat ~/.ssh/id_ed25519
+touch ~/.ssh/authorized_keys && chmod 600 ~/.ssh/authorized_keys
+exit
 ```
-> [!CAUTION]
-> Salin seluruh isi `~/.ssh/id_ed25519` (termasuk `-----BEGIN OPENSSH PRIVATE KEY-----` dan `-----END OPENSSH PRIVATE KEY-----`). Kunci ini akan dimasukkan ke GitHub Secrets (`VPS_SSH_KEY`).
 
 ---
 
 ### B. Konfigurasi Sudoers Tanpa Password (`NOPASSWD`)
-User `deployer` memerlukan izin untuk me-restart layanan systemd tanpa harus memasukkan password sudo interaktif.
+User `deployer` memerlukan izin untuk me-restart layanan Systemd dan reload Nginx tanpa harus memasukkan password interaktif (karena runner CI/CD berjalan non-interaktif).
 
-Buat berkas konfigurasi sudoers khusus:
+Gunakan prinsip hak akses paling minim (*least privilege*):
 ```bash
 sudo nano /etc/sudoers.d/erp-deployer
 ```
 
-Isi berkas tersebut dengan pembatasan perintah ketat (*least privilege*):
+Isi berkas tersebut dengan pembatasan perintah ketat:
 ```text
 # Izinkan user deployer merestart & memeriksa layanan ERP Monolith tanpa password
-deployer ALL=(ALL) NOPASSWD: /bin/systemctl restart erp-backend, /bin/systemctl restart erp-frontend, /bin/systemctl restart erp.target, /bin/systemctl status erp*, /bin/systemctl reload nginx
+deployer ALL=(ALL) NOPASSWD: /bin/systemctl restart erp-backend, \
+                             /bin/systemctl restart erp-frontend, \
+                             /bin/systemctl restart erp.target, \
+                             /bin/systemctl reload erp.target, \
+                             /bin/systemctl status erp*, \
+                             /bin/systemctl is-active erp*, \
+                             /bin/journalctl -u erp*, \
+                             /bin/systemctl reload nginx, \
+                             /bin/systemctl restart nginx
 ```
 
 Uji validitas sintaks sudoers:
@@ -126,19 +137,123 @@ sudo visudo -cf /etc/sudoers.d/erp-deployer
 
 ---
 
-### C. Menyiapkan Struktur Direktori di VPS
-Pastikan direktori aplikasi di VPS sudah dibuat dan user `deployer` memiliki hak tulis:
+### C. Menyiapkan Struktur Direktori & SetGID di VPS
+Pastikan direktori aplikasi di VPS sudah dibuat dan user `deployer` memiliki hak tulis, serta pasang flag **SetGID** agar file/folder baru otomatis mewarisi grup `erp`:
 
 ```bash
+# 1. Buat hierarki folder
 sudo mkdir -p /opt/dev/erp_monolith/backend/bin
 sudo mkdir -p /opt/dev/erp_monolith/backend/migrations
 sudo mkdir -p /opt/dev/erp_monolith/frontend/build
 sudo mkdir -p /etc/erp
 
-# Berikan izin ke grup erp di mana deployer tergabung
-sudo chown -R erp:erp /opt/dev/erp_monolith
+# 2. Berikan izin kepemilikan ke deployer:erp
+sudo chown -R deployer:erp /opt/dev/erp_monolith
+sudo chown -R deployer:erp /etc/erp
 sudo chmod -R 775 /opt/dev/erp_monolith
+sudo chmod 750 /etc/erp
+
+# 3. SetGID bit agar setiap file baru otomatis memiliki group 'erp'
+sudo find /opt/dev/erp_monolith -type d -exec chmod g+s {} +
 ```
+
+---
+
+### D. SSH dari Server Ubuntu ke GitHub (Push & Pull)
+Skenario ini digunakan jika **server Ubuntu bertindak sebagai SSH Client** untuk mengakses **GitHub** (misal menjalankan `git pull origin main` di VPS, atau melakukan `git push` tag/commit rilis dari server).
+
+```bash
+# 1. Masuk sebagai user deployer
+sudo su - deployer
+
+# 2. Generate SSH key Ed25519 khusus GitHub (tanpa passphrase untuk otomasi)
+ssh-keygen -t ed25519 -C "deployer-vps-erp@github" -f ~/.ssh/id_ed25519_github -N ""
+
+# 3. Salin Public Key yang dihasilkan:
+cat ~/.ssh/id_ed25519_github.pub
+```
+
+#### Mendaftarkan Kunci ke GitHub:
+- Buka repositori GitHub: **Settings** ➔ **Deploy keys** ➔ **Add deploy key**.
+- Berikan Title: `VPS Ubuntu ERP Production (Deployer)`.
+- Paste isi `id_ed25519_github.pub`.
+- **PENTING:** Jika server perlu melakukan `git push`, centang **"Allow write access"**. (Jika hanya untuk pull/clone, biarkan uncheck).
+- Klik **Add key**.
+
+#### Pengujian dan Konfigurasi Git di Server:
+```bash
+# Daftarkan fingerprint GitHub ke known_hosts
+ssh-keyscan -t ed25519 github.com >> ~/.ssh/known_hosts
+chmod 644 ~/.ssh/known_hosts
+
+# Uji otentikasi SSH ke GitHub
+ssh -T git@github.com
+# Sukses jika muncul: Hi <repo_or_user>! You've successfully authenticated...
+
+# Pastikan git remote menggunakan SSH URL (bukan HTTPS)
+cd /opt/dev/erp_monolith
+git remote set-url origin git@github.com:perusahaan/erp_monolith.git
+```
+
+---
+
+### E. Pembuatan & Manajemen Berkas `~/.ssh/config`
+Berkas `~/.ssh/config` menyederhanakan koneksi, mencegah error *"Too many authentication failures"*, dan mengaktifkan fitur *keep-alive*.
+
+Buat berkas konfigurasi di VPS sebagai user `deployer`:
+```bash
+sudo su - deployer
+nano ~/.ssh/config
+```
+
+Isi dengan konfigurasi berikut:
+```ssh-config
+# ========================================================
+# Profil GitHub Default untuk Git Clone / Fetch / Push
+# ========================================================
+Host github.com
+    HostName github.com
+    User git
+    IdentityFile ~/.ssh/id_ed25519_github
+    IdentitiesOnly yes
+    ServerAliveInterval 30
+    ServerAliveCountMax 4
+    StrictHostKeyChecking accept-new
+```
+
+Kunci izin berkas config (wajib):
+```bash
+chmod 600 ~/.ssh/config
+```
+
+*(Tips: Di komputer lokal developer, Anda juga dapat menambahkan blok `Host erp-prod` dengan `HostName <IP_VPS>`, `User deployer`, dan `IdentityFile ~/.ssh/id_ed25519` agar dapat login cepat hanya dengan mengetik `ssh erp-prod`).*
+
+---
+
+### F. SSH dari GitHub Actions Deploy ke Server Ubuntu
+Skenario ini digunakan untuk **GitHub Actions Runner (SSH Client)** yang akan terhubung ke **Server VPS Ubuntu (SSH Server)** guna mentransfer binary dan merestart service.
+
+#### 1. Buat Pasangan Kunci Khusus CI/CD Deployer:
+Jalankan di VPS atau laptop lokal:
+```bash
+ssh-keygen -t ed25519 -C "github-actions-ci-cd-erp" -f ~/github_actions_deploy -N ""
+```
+
+#### 2. Pasang Public Key di VPS:
+Tambahkan isi `github_actions_deploy.pub` ke file `authorized_keys` milik `deployer`:
+```bash
+sudo su - deployer
+cat ~/github_actions_deploy.pub >> ~/.ssh/authorized_keys
+chmod 600 ~/.ssh/authorized_keys
+```
+*(Opsional untuk keamanan ekstra: tambahkan opsi `no-port-forwarding,no-X11-forwarding,no-agent-forwarding` di awal baris kunci pada `authorized_keys`).*
+
+#### 3. Simpan Private Key ke GitHub Secrets:
+Tampilkan isi private key:
+```bash
+cat ~/github_actions_deploy
+```
+Salin SELURUH isinya (termasuk header `-----BEGIN OPENSSH PRIVATE KEY-----` dan footer `-----END OPENSSH PRIVATE KEY-----`), lalu simpan di GitHub Repository: **Settings** ➔ **Secrets and variables** ➔ **Actions** ➔ **New repository secret** dengan nama `VPS_SSH_KEY`.
 
 ---
 
