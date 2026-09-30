@@ -14,8 +14,8 @@ Dokumen ini adalah panduan resmi untuk menginstal, mengonfigurasi dengan basis d
    - [D. Menjalankan Layanan Kong](#d-menjalankan-layanan-kong)
 4. [Cara Menambahkan Service, Route & Endpoint di Proyek Ini](#4-cara-menambahkan-service-route--endpoint-di-proyek-ini)
    - [A. Konsep: Upstream, Service, Route & Plugin](#a-konsep-upstream-service-route--plugin)
-   - [B. Mendaftarkan Service Backend Echo v5](#b-mendaftarkan-service-backend-echo-v5)
-   - [C. Mendaftarkan Endpoint / Rute Modul ERP](#c-mendaftarkan-endpoint--rute-modul-erp)
+   - [B. Mendaftarkan Service Backend & Frontend](#b-mendaftarkan-service-backend--frontend)
+   - [C. Mendaftarkan Route: Routing Lalu Lintas API vs Frontend](#c-mendaftarkan-route-routing-lalu-lintas-api-vs-frontend)
    - [D. Memasang Plugin: Rate Limiting (Redis), CORS, dan JWT](#d-memasang-plugin-rate-limiting-redis-cors-dan-jwt)
 5. [Konfigurasi Deklaratif Alternatif (decK / `kong.yaml`)](#5-konfigurasi-deklaratif-alternatif-deck--kongyaml)
 6. [Pengujian Endpoint & Integrasi Frontend (SvelteKit 2)](#6-pengujian-endpoint--integrasi-frontend-sveltekit-2)
@@ -25,7 +25,7 @@ Dokumen ini adalah panduan resmi untuk menginstal, mengonfigurasi dengan basis d
 
 ## 1. Arsitektur Kong API Gateway di ERP Monolith
 
-Kong bertindak sebagai gerbang terpusat (*Reverse Proxy & API Gateway*) yang melindungi backend Echo v5:
+Kong bertindak sebagai gerbang terpusat (*Reverse Proxy & API Gateway*) yang melindungi backend Echo v5 dan melayani frontend SvelteKit 2:
 
 ```text
 ┌────────────────────────────────────────────────────────┐
@@ -38,20 +38,19 @@ Kong bertindak sebagai gerbang terpusat (*Reverse Proxy & API Gateway*) yang mel
 │ • Proxy Port :8000 (HTTP) / :8443 (HTTPS)              │
 │ • Admin API :8001 / Admin GUI (Manager) :8002          │
 │ • Fitur: Rate Limiting (Redis), CORS, JWT, Logging     │
-└─────────────┬───────────────────────────┬──────────────┘
-              │                           │
-   (Direct :5432 Internal State)          │ Reverse Proxy Forward
-              │                           ▼
-┌─────────────▼──────────┐   ┌───────────────────────────┐
-│ PostgreSQL (kong_db)   │   │ Echo v5 Backend Monolith  │
-│ Port 5432 (Bukan 6432) │   │ Port 8080 (:8080)         │
-└────────────────────────┘   └─────────────┬─────────────┘
-                                           │
-                              (pgxpool via PgBouncer :6432)
-                                           ▼
-                             ┌───────────────────────────┐
-                             │ PostgreSQL (erp_db)       │
-                             └───────────────────────────┘
+└──────┬──────────────────────┬──────────────────────┬───┘
+       │                      │                      │
+       │ (Direct :5432)       │ Path: /api/v1/*      │ Path: /* (Selain /api/v1)
+       ▼                      ▼                      ▼
+┌──────────────┐   ┌──────────────────────┐   ┌──────────────────────┐
+│ PostgreSQL   │   │ Echo v5 Backend      │   │ SvelteKit 2 Frontend │
+│ (kong_db)    │   │ Monolith Port :8080  │   │ Node/Bun Port :3000  │
+│ Port 5432    │   └──────────┬───────────┘   └──────────────────────┘
+└──────────────┘              │
+                              ▼ (pgxpool via PgBouncer :6432)
+                   ┌──────────────────────┐
+                   │ PostgreSQL (erp_db)  │
+                   └──────────────────────┘
 ```
 
 > [!CAUTION]
@@ -206,15 +205,16 @@ Output sukses akan mengembalikan kode HTTP `200 OK` dengan status database `reac
 ## 4. Cara Menambahkan Service, Route & Endpoint di Proyek Ini
 
 ### A. Konsep Dasar Kong
-- **Service**: Merepresentasikan aplikasi backend upstream yang dituju (yaitu backend Echo v5 di `http://127.0.0.1:8080`).
+- **Service**: Merepresentasikan aplikasi upstream yang dituju (backend Echo v5 di `http://127.0.0.1:8080` dan frontend SvelteKit 2 di `http://127.0.0.1:3000`).
 - **Route**: Aturan pencocokan (*path matching*) yang menentukan ke Service mana request dari client akan diarahkan.
 - **Plugin**: Middleware fungsional tambahan (Rate Limiting, CORS, JWT Auth, Logging) yang dapat dipasang ke Service atau Route tertentu.
 
 ---
 
-### B. Mendaftarkan Service Backend Echo v5
+### B. Mendaftarkan Service Backend & Frontend
 
-Daftarkan aplikasi backend monolith sebagai sebuah Service di Kong:
+#### 1. Mendaftarkan Service Backend Echo v5
+Daftarkan aplikasi backend monolith (Echo v5) sebagai upstream service:
 
 ```bash
 curl -i -X POST http://localhost:8001/services \
@@ -225,16 +225,63 @@ curl -i -X POST http://localhost:8001/services \
   --data "read_timeout=60000"
 ```
 
----
+#### 2. Mendaftarkan Service Frontend SvelteKit 2
+Daftarkan server frontend SvelteKit 2 sebagai upstream service:
 
-### C. Mendaftarkan Endpoint / Rute Modul ERP
-
-Setiap endpoint modul ERP didaftarkan sebagai **Route** di bawah service `erp-backend-service`.
+```bash
+curl -i -X POST http://localhost:8001/services \
+  --data "name=erp-frontend-service" \
+  --data "url=http://127.0.0.1:3000" \
+  --data "connect_timeout=60000" \
+  --data "write_timeout=60000" \
+  --data "read_timeout=60000"
+```
 
 > [!NOTE]
-> Parameter `strip_path=false` memastikan bahwa prefix path URL (misal `/api/v1/acc`) **tetap dikirim secara utuh** ke Echo v5 router.
+> - **Mode Standalone / Production**: Port `3000` adalah port default server Node/Bun SvelteKit (`adapter-node`).
+> - **Mode Pengembangan (Vite Dev Server)**: Jika sedang menjalankan `bun run dev`, ganti url menjadi `http://127.0.0.1:5173`.
 
-#### 1. Endpoint Health Check
+---
+
+### C. Mendaftarkan Route: Routing Lalu Lintas API vs Frontend
+
+Kong Gateway menggunakan algoritma pencocokan prefix terpanjang (*longest prefix match precedence*):
+1. **Endpoint `/api/v1`** (prefix 7 karakter) diprioritaskan langsung ke **`erp-backend-service`**.
+2. **Endpoint selain `/api/v1`** (seperti root path `/`, prefix 1 karakter) diarahkan ke **`erp-frontend-service`**.
+
+> [!NOTE]
+> Parameter `strip_path=false` memastikan bahwa path URL (misal `/api/v1/acc` atau `/dashboard`) **tetap dikirim secara utuh** ke backend Echo v5 maupun frontend SvelteKit router.
+
+#### 1. Mendaftarkan Endpoint `/api/v1` Langsung ke Service Backend
+Perintah curl untuk mendaftarkan rute utama `/api/v1` langsung menuju backend Echo v5:
+
+```bash
+curl -i -X POST http://localhost:8001/services/erp-backend-service/routes \
+  --data "name=route-backend-api-v1" \
+  --data "paths[]=/api/v1" \
+  --data "strip_path=false"
+```
+
+#### 2. Mendaftarkan Endpoint Selain `/api/v1` ke Service Frontend (Catch-All)
+Perintah curl untuk mendaftarkan seluruh endpoint selain `/api/v1` (halaman root `/`, halaman UI aplikasi, assets statis SvelteKit `/_app/*`) langsung menuju frontend SvelteKit:
+
+```bash
+curl -i -X POST http://localhost:8001/services/erp-frontend-service/routes \
+  --data "name=route-frontend-all" \
+  --data "paths[]=/" \
+  --data "strip_path=false"
+```
+
+> [!TIP]
+> **Mengapa Rute Catch-All `/` Tidak Menimpa `/api/v1`?**
+> Di Kong API Gateway, aturan pencocokan jalur (*path matching precedence*) memprioritaskan rute dengan karakter jalur terpanjang:
+> - Request ke `http://localhost:8000/api/v1/...` cocok dengan rute `route-backend-api-v1` (panjang 7 karakter) ➔ **Diteruskan ke Backend (:8080)**.
+> - Request selain `/api/v1` (seperti `http://localhost:8000/`, `/login`, `/dashboard`, `/_app/...`) cocok dengan rute `route-frontend-all` (panjang 1 karakter) ➔ **Diteruskan ke Frontend (:3000)**.
+
+#### 3. Endpoint Khusus / Granular Backend (Opsional)
+Jika Anda membutuhkan aturan plugin spesifik (misal rate-limiting khusus, method restriction, atau monitoring granular), Anda dapat mendaftarkan rute spesifik tambahan di bawah `erp-backend-service`:
+
+##### a. Endpoint Health Check
 ```bash
 curl -i -X POST http://localhost:8001/services/erp-backend-service/routes \
   --data "name=route-health" \
@@ -243,59 +290,42 @@ curl -i -X POST http://localhost:8001/services/erp-backend-service/routes \
   --data "methods[]=GET"
 ```
 
-#### 2. Endpoint Autentikasi & Pengguna (19_USR, 21_ADM)
+##### b. Sub-Rute Modul ERP Granular (Jika Perlu Dikelola Terpisah)
 ```bash
+# Autentikasi & Pengguna (19_USR, 21_ADM)
 curl -i -X POST http://localhost:8001/services/erp-backend-service/routes \
   --data "name=route-auth" \
   --data "paths[]=/api/v1/auth" \
   --data "strip_path=false"
-```
 
-#### 3. Endpoint Modul Akuntansi & Keuangan (1_ACC, 4_GL, 2_AP, 3_AR)
-```bash
+# Modul Akuntansi & Keuangan (1_ACC, 4_GL, 2_AP, 3_AR)
 curl -i -X POST http://localhost:8001/services/erp-backend-service/routes \
   --data "name=route-accounting" \
   --data "paths[]=/api/v1/acc" \
   --data "strip_path=false"
-```
 
-#### 4. Endpoint Modul Persediaan & Pergudangan (9_INV)
-```bash
+# Modul Persediaan & Pergudangan (9_INV)
 curl -i -X POST http://localhost:8001/services/erp-backend-service/routes \
   --data "name=route-inventory" \
   --data "paths[]=/api/v1/inv" \
   --data "strip_path=false"
-```
 
-#### 5. Endpoint Modul Penjualan & Kasir POS (10_SAL, 12_POS)
-```bash
+# Modul Penjualan & Kasir POS (10_SAL, 12_POS)
 curl -i -X POST http://localhost:8001/services/erp-backend-service/routes \
   --data "name=route-sales" \
   --data "paths[]=/api/v1/sal" \
   --data "strip_path=false"
-```
 
-#### 6. Endpoint Modul Pembelian & Pengadaan (8_PUR)
-```bash
+# Modul Pembelian & Pengadaan (8_PUR)
 curl -i -X POST http://localhost:8001/services/erp-backend-service/routes \
   --data "name=route-purchasing" \
   --data "paths[]=/api/v1/pur" \
   --data "strip_path=false"
-```
 
-#### 7. Endpoint Modul SDM & Penggajian (15_HRM, 16_PAY, 17_ATT)
-```bash
+# Modul SDM & Penggajian (15_HRM, 16_PAY, 17_ATT)
 curl -i -X POST http://localhost:8001/services/erp-backend-service/routes \
   --data "name=route-hrm" \
   --data "paths[]=/api/v1/hrm" \
-  --data "strip_path=false"
-```
-
-#### 8. Catch-All Route untuk Seluruh Endpoint API Lainnya
-```bash
-curl -i -X POST http://localhost:8001/services/erp-backend-service/routes \
-  --data "name=route-api-fallback" \
-  --data "paths[]=/api" \
   --data "strip_path=false"
 ```
 
@@ -365,46 +395,25 @@ Simpan file deklaratif berikut sebagai `kong.yaml` di root proyek:
 _format_version: "3.0"
 
 services:
+  # ----------------------------------------------------
+  # 1. Service Backend Echo v5 Monolith
+  # ----------------------------------------------------
   - name: erp-backend-service
     url: http://127.0.0.1:8080
     connect_timeout: 60000
     write_timeout: 60000
     read_timeout: 60000
     routes:
+      - name: route-backend-api-v1
+        paths:
+          - /api/v1
+        strip_path: false
       - name: route-health
         paths:
           - /health
         strip_path: false
         methods:
           - GET
-      - name: route-auth
-        paths:
-          - /api/v1/auth
-        strip_path: false
-      - name: route-accounting
-        paths:
-          - /api/v1/acc
-        strip_path: false
-      - name: route-inventory
-        paths:
-          - /api/v1/inv
-        strip_path: false
-      - name: route-sales
-        paths:
-          - /api/v1/sal
-        strip_path: false
-      - name: route-purchasing
-        paths:
-          - /api/v1/pur
-        strip_path: false
-      - name: route-hrm
-        paths:
-          - /api/v1/hrm
-        strip_path: false
-      - name: route-api-fallback
-        paths:
-          - /api
-        strip_path: false
     plugins:
       - name: correlation-id
         config:
@@ -418,6 +427,20 @@ services:
           redis_host: 127.0.0.1
           redis_port: 6379
           redis_password: erp_redis_secret
+
+  # ----------------------------------------------------
+  # 2. Service Frontend SvelteKit 2
+  # ----------------------------------------------------
+  - name: erp-frontend-service
+    url: http://127.0.0.1:3000
+    connect_timeout: 60000
+    write_timeout: 60000
+    read_timeout: 60000
+    routes:
+      - name: route-frontend-all
+        paths:
+          - /
+        strip_path: false
 ```
 
 ### Sinkronisasi Deklaratif dengan `deck`:
@@ -441,10 +464,28 @@ deck gateway sync kong.yaml --kong-addr http://localhost:8001
    go run cmd/server/main.go
    ```
 
-2. Panggil endpoint `/health` melalui Kong Proxy Port `:8000`:
+2. Jalankan server frontend SvelteKit 2:
    ```bash
-   curl -i http://localhost:8000/health
+   cd /opt/dev/erp_monolith/frontend
+   bun run build && bun run preview   # port 3000
+   # atau untuk mode dev: bun run dev -- --port 3000
    ```
+
+3. Uji Coba Akses Melalui Kong Proxy Port `:8000`:
+   - **Akses Frontend (Selain `/api/v1`)**:
+     Buka di browser atau via curl:
+     ```bash
+     curl -i http://localhost:8000/
+     ```
+     Kong akan meneruskan request ke **`erp-frontend-service`** (`http://127.0.0.1:3000`).
+
+   - **Akses Backend API (`/api/v1`)**:
+     ```bash
+     curl -i http://localhost:8000/api/v1/auth/login
+     # atau health check
+     curl -i http://localhost:8000/health
+     ```
+     Kong akan memprioritaskan dan meneruskan request ke **`erp-backend-service`** (`http://127.0.0.1:8080`).
    *Respon:*
    ```http
    HTTP/1.1 200 OK
