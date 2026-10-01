@@ -104,35 +104,67 @@ jobs:
           path: frontend-dist
 
       - name: 🔑 Configure SSH Key
+        env:
+          VPS_SSH_KEY: ${{ secrets.VPS_SSH_KEY }}
+          VPS_HOST: ${{ secrets.VPS_HOST }}
+          VPS_PORT: ${{ secrets.VPS_PORT || '22' }}
         run: |
           mkdir -p ~/.ssh
-          echo "${{ secrets.VPS_SSH_KEY }}" > ~/.ssh/id_ed25519
+          chmod 700 ~/.ssh
+
+          # 1. Validasi ketersediaan secret
+          if [ -z "$VPS_SSH_KEY" ]; then
+            echo "::error::Secret VPS_SSH_KEY kosong atau belum diisi pada GitHub Repository Secrets!"
+            exit 1
+          fi
+          if [ -z "$VPS_HOST" ]; then
+            echo "::error::Secret VPS_HOST kosong atau belum diisi pada GitHub Repository Secrets!"
+            exit 1
+          fi
+
+          # 2. Simpan private key dengan line ending UNIX
+          printf '%s\n' "$VPS_SSH_KEY" | tr -d '\r' > ~/.ssh/id_ed25519
           chmod 600 ~/.ssh/id_ed25519
-          ssh-keyscan -p ${{ secrets.VPS_PORT || 22 }} ${{ secrets.VPS_HOST }} >> ~/.ssh/known_hosts
+
+          # 3. Ambil host key server VPS jika memungkinkan (toleran jika timeout/blocked)
+          ssh-keyscan -p "${VPS_PORT:-22}" -H "$VPS_HOST" >> ~/.ssh/known_hosts 2>/dev/null || true
+
+          # 4. Buat konfigurasi SSH client
+          cat >> ~/.ssh/config <<EOF
+          Host *
+              Port ${VPS_PORT:-22}
+              StrictHostKeyChecking accept-new
+              ServerAliveInterval 30
+              ServerAliveCountMax 4
+              IdentityFile ~/.ssh/id_ed25519
+          EOF
+          chmod 600 ~/.ssh/config
 
       - name: 🚚 Transfer Artifacts to VPS via Rsync
         env:
-          PORT: ${{ secrets.VPS_PORT || 22 }}
-          USER: ${{ secrets.VPS_USER }}
+          PORT: ${{ secrets.VPS_PORT || '22' }}
+          USER: ${{ secrets.VPS_USER || 'deployer' }}
           HOST: ${{ secrets.VPS_HOST }}
         run: |
+          SSH_OPTS="ssh -o StrictHostKeyChecking=accept-new -i ~/.ssh/id_ed25519 -p $PORT"
+
           # 0. Pastikan direktori tujuan tersedia di remote VPS
-          ssh -i ~/.ssh/id_ed25519 -p $PORT $USER@$HOST "mkdir -p /opt/apps/erp_monolith/backend/bin /opt/apps/erp_monolith/frontend /opt/dev/erp_monolith/backend/migrations"
+          $SSH_OPTS $USER@$HOST "mkdir -p /opt/apps/erp_monolith/backend/bin /opt/apps/erp_monolith/frontend /opt/dev/erp_monolith/backend/migrations"
 
           # 1. Kirim binary baru backend ke file temporary .new
-          scp -i ~/.ssh/id_ed25519 -P $PORT backend-dist/erp-backend $USER@$HOST:/opt/apps/erp_monolith/backend/bin/erp-backend.new
+          scp -o StrictHostKeyChecking=accept-new -i ~/.ssh/id_ed25519 -P $PORT backend-dist/erp-backend $USER@$HOST:/opt/apps/erp_monolith/backend/bin/erp-backend.new
           
           # 2. Kirim migrasi database
-          rsync -avz -e "ssh -i ~/.ssh/id_ed25519 -p $PORT" --delete backend/migrations/ $USER@$HOST:/opt/dev/erp_monolith/backend/migrations/
+          rsync -avz -e "$SSH_OPTS" --delete backend/migrations/ $USER@$HOST:/opt/dev/erp_monolith/backend/migrations/
 
           # 3. Kirim folder build frontend
-          rsync -avz -e "ssh -i ~/.ssh/id_ed25519 -p $PORT" --delete frontend-dist/ $USER@$HOST:/opt/apps/erp_monolith/frontend/
+          rsync -avz -e "$SSH_OPTS" --delete frontend-dist/ $USER@$HOST:/opt/apps/erp_monolith/frontend/
 
       - name: ⚡ Execute Deployment Commands on Remote VPS
         uses: appleboy/ssh-action@v1.0.3
         with:
           host: ${{ secrets.VPS_HOST }}
-          username: ${{ secrets.VPS_USER }}
+          username: ${{ secrets.VPS_USER || 'deployer' }}
           key: ${{ secrets.VPS_SSH_KEY }}
           port: ${{ secrets.VPS_PORT || 22 }}
           script: |
