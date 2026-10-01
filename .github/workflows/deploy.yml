@@ -126,10 +126,15 @@ jobs:
           printf '%s\n' "$VPS_SSH_KEY" | tr -d '\r' > ~/.ssh/id_ed25519
           chmod 600 ~/.ssh/id_ed25519
 
-          # 3. Ambil host key server VPS jika memungkinkan (toleran jika timeout/blocked)
-          ssh-keyscan -p "${VPS_PORT:-22}" -H "$VPS_HOST" >> ~/.ssh/known_hosts 2>/dev/null || true
+          # 3. Tampilkan validasi fingerprint kunci (tanpa membocorkan isi private key)
+          echo "🔍 Memeriksa format SSH Key..."
+          ssh-keygen -l -f ~/.ssh/id_ed25519 || echo "⚠️ Warning: format key mungkin tidak standar!"
 
-          # 4. Buat konfigurasi SSH client secara aman tanpa heredoc EOF syntax error
+          # 4. Ambil host key server VPS jika memungkinkan (toleran jika timeout/blocked)
+          CLEAN_HOST=$(echo "$VPS_HOST" | sed -E "s|^https?://||; s|/.*$||; s|:[0-9]+$||")
+          ssh-keyscan -p "${VPS_PORT:-22}" -H "$CLEAN_HOST" >> ~/.ssh/known_hosts 2>/dev/null || true
+
+          # 5. Buat konfigurasi SSH client secara aman tanpa heredoc EOF syntax error
           printf "Host *\n  Port %s\n  StrictHostKeyChecking accept-new\n  ServerAliveInterval 30\n  ServerAliveCountMax 4\n  IdentityFile %s/.ssh/id_ed25519\n" "${VPS_PORT:-22}" "$HOME" > ~/.ssh/config
           chmod 600 ~/.ssh/config
 
@@ -140,26 +145,45 @@ jobs:
           HOST: ${{ secrets.VPS_HOST }}
         run: |
           KEY_PATH="$HOME/.ssh/id_ed25519"
+          CLEAN_HOST=$(echo "$HOST" | sed -E "s|^https?://||; s|/.*$||; s|:[0-9]+$||")
+
+          echo "=========================================="
+          echo "🔍 DIAGNOSTIK KONEKSI SSH KE VPS"
+          echo "=========================================="
+          echo "Target User : $USER"
+          echo "Target Host : $CLEAN_HOST"
+          echo "Target Port : $PORT"
+          echo "File Kunci  : $KEY_PATH"
+          echo "Ukuran File : $(wc -c < "$KEY_PATH") bytes ($(wc -l < "$KEY_PATH") baris)"
+          echo "Fingerprint Kunci:"
+          ssh-keygen -l -f "$KEY_PATH" || echo "⚠️ Kunci tidak dapat dibaca oleh ssh-keygen!"
+          echo "Daftar ~/.ssh:"
+          ls -la "$HOME/.ssh/"
+          echo "Isi ~/.ssh/config:"
+          cat "$HOME/.ssh/config"
+          echo "=========================================="
+
+          # 0. Uji koneksi SSH dengan mode verbose penuh (-vvv) agar penyebab error tampil di GitHub Actions
+          echo "🔌 Menjalankan SSH Handshake Verbose (-vvv)..."
+          ssh -vvv -i "$KEY_PATH" -p "$PORT" -o ConnectTimeout=15 -o StrictHostKeyChecking=accept-new "$USER@$CLEAN_HOST" "echo '✅ SSH connection handshake & authentication SUCCESSFUL to VPS!'"
+
           SSH_CMD="ssh -i $KEY_PATH -p $PORT -o StrictHostKeyChecking=accept-new"
 
-          # 0. Uji koneksi SSH terlebih dahulu
-          echo "🔌 Menguji koneksi SSH ke $USER@$HOST:$PORT..."
-          $SSH_CMD "$USER@$HOST" "echo '✅ SSH connection successful to VPS.'"
-
           # 1. Pastikan direktori tujuan tersedia di remote VPS
-          $SSH_CMD "$USER@$HOST" "mkdir -p /opt/apps/erp_monolith/backend/bin /opt/apps/erp_monolith/frontend /opt/dev/erp_monolith/backend/migrations"
+          echo "📁 Menyiapkan direktori tujuan..."
+          $SSH_CMD "$USER@$CLEAN_HOST" "mkdir -p /opt/apps/erp_monolith/backend/bin /opt/apps/erp_monolith/frontend /opt/dev/erp_monolith/backend/migrations"
 
           # 2. Kirim binary baru backend ke file temporary .new
-          echo "📦 Mengirim binary backend..."
-          scp -i "$KEY_PATH" -P "$PORT" -o StrictHostKeyChecking=accept-new backend-dist/erp-backend "$USER@$HOST:/opt/apps/erp_monolith/backend/bin/erp-backend.new"
+          echo "📦 Mengirim binary backend via SCP..."
+          scp -v -i "$KEY_PATH" -P "$PORT" -o StrictHostKeyChecking=accept-new backend-dist/erp-backend "$USER@$CLEAN_HOST:/opt/apps/erp_monolith/backend/bin/erp-backend.new"
           
           # 3. Kirim migrasi database
-          echo "🗄️ Sinkronisasi berkas migrasi database..."
-          rsync -avz -e "$SSH_CMD" --delete backend/migrations/ "$USER@$HOST:/opt/dev/erp_monolith/backend/migrations/"
+          echo "🗄️ Sinkronisasi berkas migrasi database via Rsync..."
+          rsync -avz -v -e "$SSH_CMD" --delete backend/migrations/ "$USER@$CLEAN_HOST:/opt/dev/erp_monolith/backend/migrations/"
 
           # 4. Kirim folder build frontend
-          echo "🎨 Sinkronisasi berkas build frontend..."
-          rsync -avz -e "$SSH_CMD" --delete frontend-dist/ "$USER@$HOST:/opt/apps/erp_monolith/frontend/"
+          echo "🎨 Sinkronisasi berkas build frontend via Rsync..."
+          rsync -avz -v -e "$SSH_CMD" --delete frontend-dist/ "$USER@$CLEAN_HOST:/opt/apps/erp_monolith/frontend/"
 
       - name: ⚡ Execute Deployment Commands on Remote VPS
         uses: appleboy/ssh-action@v1.0.3
