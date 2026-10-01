@@ -116,14 +116,17 @@ jobs:
           USER: ${{ secrets.VPS_USER }}
           HOST: ${{ secrets.VPS_HOST }}
         run: |
+          # 0. Pastikan direktori tujuan tersedia di remote VPS
+          ssh -i ~/.ssh/id_ed25519 -p $PORT $USER@$HOST "mkdir -p /opt/apps/erp_monolith/backend/bin /opt/apps/erp_monolith/frontend /opt/dev/erp_monolith/backend/migrations"
+
           # 1. Kirim binary baru backend ke file temporary .new
-          scp -P $PORT backend-dist/erp-backend $USER@$HOST:/opt/apps/erp_monolith/backend/bin/erp-backend.new
+          scp -i ~/.ssh/id_ed25519 -P $PORT backend-dist/erp-backend $USER@$HOST:/opt/apps/erp_monolith/backend/bin/erp-backend.new
           
           # 2. Kirim migrasi database
-          rsync -avz -e "ssh -p $PORT" --delete backend/migrations/ $USER@$HOST:/opt/dev/erp_monolith/backend/migrations/
+          rsync -avz -e "ssh -i ~/.ssh/id_ed25519 -p $PORT" --delete backend/migrations/ $USER@$HOST:/opt/dev/erp_monolith/backend/migrations/
 
           # 3. Kirim folder build frontend
-          rsync -avz -e "ssh -p $PORT" --delete frontend-dist/ $USER@$HOST:/opt/apps/erp_monolith/frontend/
+          rsync -avz -e "ssh -i ~/.ssh/id_ed25519 -p $PORT" --delete frontend-dist/ $USER@$HOST:/opt/apps/erp_monolith/frontend/
 
       - name: ⚡ Execute Deployment Commands on Remote VPS
         uses: appleboy/ssh-action@v1.0.3
