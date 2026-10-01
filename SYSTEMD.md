@@ -599,6 +599,37 @@ sudo systemctl enable erp-monolith-frontend.service
 > 💡 **Catatan Unit Systemd:**  
 > Pastikan meng-enable file unit `.service` (`erp-monolith-frontend.service`), bukan file environment (`.env`). File konfigurasi environment (`/etc/erp_monolith/erp-monolith-frontend.env`) dimuat secara otomatis oleh systemd melalui direktif `EnvironmentFile` di dalam berkas unit.
 
+##### Cara Menampilkan Log Service (systemctl & journalctl)
+Untuk memantau aktivitas, memeriksa output konsol (`stdout`/`stderr`), atau mendiagnosis error saat service berjalan:
+
+1. **Cek Status & Cuplikan Log Terakhir (`systemctl status`):**
+   ```bash
+   # Menampilkan status service beserta baris-baris log terakhir
+   sudo systemctl status erp-monolith-frontend.service
+   ```
+
+2. **Streaming Log Real-Time / Live Follow (`journalctl -f`):**
+   ```bash
+   # Memantau log secara live saat aplikasi berjalan (tekan Ctrl+C untuk keluar)
+   sudo journalctl -u erp-monolith-frontend.service -f
+   ```
+
+3. **Melihat N Baris Log Terakhir (`journalctl -n`):**
+   ```bash
+   # Menampilkan 50 baris log terakhir langsung di terminal (tanpa pager)
+   sudo journalctl -u erp-monolith-frontend.service -n 50 --no-pager
+   ```
+
+4. **Filter Log Berdasarkan Waktu atau Level Error:**
+   ```bash
+   # Menampilkan log dalam 10 menit terakhir
+   sudo journalctl -u erp-monolith-frontend.service --since "10 minutes ago"
+
+   # Hanya menampilkan pesan error / critical
+   sudo journalctl -u erp-monolith-frontend.service -p err --no-pager
+   ```
+
+
 #### 6. Cek File Workflow GitHub Actions Anda
 Perhatikan di file workflow GitHub Actions Anda (`Untitled-1` / `deploy.yml`), perintah restart saat ini masih dikomentari (`#`):
 
