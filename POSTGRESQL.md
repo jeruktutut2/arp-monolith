@@ -10,7 +10,7 @@ Dokumen ini adalah panduan operasional resmi untuk menginstal, mengonfigurasi, d
 3. [Konfigurasi User & Database Proyek](#3-konfigurasi-user--database-proyek)
 4. [Konfigurasi Jaringan & Autentikasi (`postgresql.conf` & `pg_hba.conf`)](#4-konfigurasi-jaringan--autentikasi)
 5. [Penggunaan di Proyek ERP Monolith](#5-penggunaan-di-proyek-erp-monolith)
-6. [Migrasi Skema (golang-migrate Direct Connection)](#6-migrasi-skema-golang-migrate-direct-connection)
+6. [Migrasi Skema (golang-migrate) & Menampilkan Tabel](#6-migrasi-skema-golang-migrate-direct-connection)
 7. [Aturan Skema & Konvensi Modul](#7-aturan-skema--konvensi-modul)
 8. [Pemeliharaan, Backup & Troubleshooting](#8-pemeliharaan-backup--troubleshooting)
 
@@ -156,6 +156,10 @@ ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT ALL ON SEQUENCES TO erp_user;
 Untuk memverifikasi koneksi dan melihat detail database `erp_db`:
 ```sql
 \l erp_db
+```
+Untuk melihat daftar tabel yang ada di dalam database saat ini:
+```sql
+\dt
 ```
 Untuk keluar dari sesi `psql` dan kembali ke terminal Linux:
 ```sql
@@ -340,6 +344,82 @@ migrate -path migrations -database "postgres://erp_user:erp_secret@localhost:543
 # Paksa reset state jika terjadi dirty migration (misal pada versi 1)
 migrate -path migrations -database "postgres://erp_user:erp_secret@localhost:5432/erp_db?sslmode=disable" force 1
 ```
+
+### Menampilkan Daftar Tabel yang Ada di Database
+
+Setelah menjalankan migrasi skema, Anda dapat memeriksa dan menampilkan tabel-tabel apa saja yang ada di database `erp_db` dengan beberapa metode berikut:
+
+#### 1. Melalui Konsol Interaktif `psql` (Meta-Commands)
+Saat berada di dalam prompt `psql` (`erp_db=#` atau `erp_db=>`):
+
+- **Menampilkan seluruh tabel** pada skema aktif (`public`):
+  ```sql
+  \dt
+  ```
+- **Menampilkan tabel dengan informasi detail** (ukuran tabel, deskripsi/komentar):
+  ```sql
+  \dt+
+  ```
+- **Menyaring tabel berdasarkan prefiks modul ERP** (misal modul akuntansi `acc_*`, persediaan `inv_*`, atau penjualan `sal_*`):
+  ```sql
+  \dt acc_*
+  \dt inv_*
+  \dt sal_*
+  ```
+- **Menampilkan seluruh objek relasi** (tabel, view, sequence):
+  ```sql
+  \d
+  ```
+- **Melihat rincian struktur kolom, tipe data, dan indeks tabel tertentu**:
+  ```sql
+  \d nama_tabel
+  -- atau dengan informasi detail tambahan (foreign keys, size, child tables):
+  \d+ nama_tabel
+  ```
+
+#### 2. Langsung dari Terminal Linux (Bash One-Liner / Non-Interaktif)
+Anda dapat melihat daftar tabel langsung dari terminal Bash tanpa perlu masuk ke konsol interaktif `psql`:
+
+- **Menampilkan semua tabel:**
+  ```bash
+  PGPASSWORD=erp_secret psql -h 127.0.0.1 -p 5432 -U erp_user -d erp_db -c "\dt"
+  ```
+- **Menampilkan tabel beserta informasi ukuran disk:**
+  ```bash
+  PGPASSWORD=erp_secret psql -h 127.0.0.1 -p 5432 -U erp_user -d erp_db -c "\dt+"
+  ```
+- **Menyaring tabel berdasarkan modul tertentu (contoh modul `acc_`):**
+  ```bash
+  PGPASSWORD=erp_secret psql -h 127.0.0.1 -p 5432 -U erp_user -d erp_db -c "\dt acc_*"
+  ```
+
+#### 3. Menggunakan Query SQL Standar (`information_schema` / `pg_tables`)
+Metode ini dapat dijalankan melalui SQL client (seperti DBeaver, DataGrip, pgAdmin), backend Go, ataupun skrip automasi:
+
+- **Menggunakan standar ANSI SQL (`information_schema.tables`):**
+  ```sql
+  SELECT table_schema, table_name 
+  FROM information_schema.tables 
+  WHERE table_schema = 'public' 
+    AND table_type = 'BASE TABLE'
+  ORDER BY table_name;
+  ```
+- **Menggunakan PostgreSQL System Catalog (`pg_tables`):**
+  ```sql
+  SELECT schemaname, tablename, tableowner 
+  FROM pg_tables 
+  WHERE schemaname = 'public' 
+  ORDER BY tablename;
+  ```
+- **Menampilkan daftar tabel beserta perkiraan jumlah baris (*row count*) dan ukuran memori/disk:**
+  ```sql
+  SELECT 
+      relname AS table_name,
+      n_live_tup AS estimated_rows,
+      pg_size_pretty(pg_total_relation_size(relid)) AS total_size
+  FROM pg_stat_user_tables
+  ORDER BY relname ASC;
+  ```
 
 ---
 
