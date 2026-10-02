@@ -64,7 +64,7 @@ func main() {
 	health.RegisterModule(e, dbPool)
 
 	// 6. Wire Business Modules (admin: 21_ADM, user: 19_USR, audit: 25_AUD)
-	system.RegisterModule(e, dbPool)
+	system.RegisterModule(e, dbPool, cfg)
 
 	// 7. Graceful Server Start via Echo v5 StartConfig
 	fmt.Printf("🌐 Server listening on http://localhost:%s\n", cfg.Server.Port)

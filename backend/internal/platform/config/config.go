@@ -11,6 +11,13 @@ import (
 type Config struct {
 	Server   ServerConfig
 	Database DatabaseConfig
+	Auth     AuthConfig
+}
+
+// AuthConfig holds JWT and security settings
+type AuthConfig struct {
+	JWTSecret          string `env:"JWT_SECRET" envDefault:"super-secret-erp-jwt-key-change-in-production"`
+	JWTExpirationHours int    `env:"JWT_EXPIRATION_HOURS" envDefault:"24"`
 }
 
 // ServerConfig holds HTTP server configuration
