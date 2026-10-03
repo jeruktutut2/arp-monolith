@@ -70,7 +70,9 @@ func TestDatabase_CommitOrRollback_Success(t *testing.T) {
 
 	var err error
 	func() {
-		defer db.CommitOrRollback(ctx, tx, &err)
+		defer func() {
+			_ = db.CommitOrRollback(ctx, tx, err)
+		}()
 		// Operation succeeded with no error
 	}()
 
@@ -89,7 +91,9 @@ func TestDatabase_CommitOrRollback_OnError(t *testing.T) {
 
 	var err error
 	func() {
-		defer db.CommitOrRollback(ctx, tx, &err)
+		defer func() {
+			_ = db.CommitOrRollback(ctx, tx, err)
+		}()
 		err = errors.New("business logic failed")
 	}()
 
@@ -108,7 +112,7 @@ func TestDatabase_CommitOrRollback_RollbackError(t *testing.T) {
 	ctx := context.Background()
 
 	err := errors.New("business error")
-	rbErr := db.CommitOrRollback(ctx, tx, &err)
+	rbErr := db.CommitOrRollback(ctx, tx, err)
 
 	if !errors.Is(rbErr, expectedErr) {
 		t.Fatalf("expected rollback error %v, got %v", expectedErr, rbErr)
@@ -124,14 +128,10 @@ func TestDatabase_CommitOrRollback_CommitError(t *testing.T) {
 	tx := &mockTx{commitErr: expectedErr}
 	ctx := context.Background()
 
-	var err error
-	commitErr := db.CommitOrRollback(ctx, tx, &err)
+	commitErr := db.CommitOrRollback(ctx, tx, nil)
 
 	if !errors.Is(commitErr, expectedErr) {
 		t.Fatalf("expected commit error %v, got %v", expectedErr, commitErr)
-	}
-	if !errors.Is(err, expectedErr) {
-		t.Fatalf("expected err pointer to be updated with commit error %v, got %v", expectedErr, err)
 	}
 	if !tx.committed {
 		t.Errorf("expected transaction to attempt commit")
@@ -142,8 +142,7 @@ func TestDatabase_CommitOrRollback_NilTx(t *testing.T) {
 	db := &postgresql{pool: nil}
 	ctx := context.Background()
 
-	var err error
-	retErr := db.CommitOrRollback(ctx, nil, &err)
+	retErr := db.CommitOrRollback(ctx, nil, nil)
 	if retErr == nil {
 		t.Fatal("expected error when tx is nil, got nil")
 	}

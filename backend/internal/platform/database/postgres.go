@@ -16,7 +16,7 @@ type Postgresql interface {
 	Begin(ctx context.Context) (pgx.Tx, error)
 	Commit(ctx context.Context, tx pgx.Tx) error
 	Rollback(ctx context.Context, tx pgx.Tx) error
-	CommitOrRollback(ctx context.Context, tx pgx.Tx, err *error) error
+	CommitOrRollback(ctx context.Context, tx pgx.Tx, err error) error
 	Close()
 }
 
@@ -53,18 +53,14 @@ func (d *postgresql) Rollback(ctx context.Context, tx pgx.Tx) error {
 	return err
 }
 
-func (d *postgresql) CommitOrRollback(ctx context.Context, tx pgx.Tx, err *error) error {
+func (d *postgresql) CommitOrRollback(ctx context.Context, tx pgx.Tx, err error) error {
 	if tx == nil {
 		return errors.New("transaction is nil")
 	}
-	if err != nil && *err != nil {
+	if err != nil {
 		return d.Rollback(ctx, tx)
 	}
-	commitErr := d.Commit(ctx, tx)
-	if commitErr != nil && err != nil && *err == nil {
-		*err = commitErr
-	}
-	return commitErr
+	return d.Commit(ctx, tx)
 }
 
 func (d *postgresql) Close() {
