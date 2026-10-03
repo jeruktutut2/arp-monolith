@@ -66,7 +66,7 @@ func (m *mockTx) Conn() *pgx.Conn {
 }
 
 func TestDatabase_CommitOrRollback_Success(t *testing.T) {
-	db := database.NewDatabase(nil)
+	db := database.NewPostgresql(nil)
 	tx := &mockTx{}
 	ctx := context.Background()
 
@@ -85,7 +85,7 @@ func TestDatabase_CommitOrRollback_Success(t *testing.T) {
 }
 
 func TestDatabase_CommitOrRollback_OnError(t *testing.T) {
-	db := database.NewDatabase(nil)
+	db := database.NewPostgresql(nil)
 	tx := &mockTx{}
 	ctx := context.Background()
 
@@ -104,7 +104,7 @@ func TestDatabase_CommitOrRollback_OnError(t *testing.T) {
 }
 
 func TestDatabase_CommitOrRollback_OnPanic(t *testing.T) {
-	db := database.NewDatabase(nil)
+	db := database.NewPostgresql(nil)
 	tx := &mockTx{}
 	ctx := context.Background()
 
@@ -129,7 +129,7 @@ func TestDatabase_CommitOrRollback_OnPanic(t *testing.T) {
 }
 
 func TestDatabase_GetDB_And_Close(t *testing.T) {
-	db := database.NewDatabase(nil)
+	db := database.NewPostgresql(nil)
 	if db.GetDB() != nil {
 		t.Errorf("expected nil pool for unit test")
 	}

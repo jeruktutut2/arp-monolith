@@ -20,44 +20,34 @@ type Postgresql interface {
 	Close()
 }
 
-// Aliases for compatibility
-type Postgrrsql = Postgresql
-type Database = Postgresql
-type DB = Postgresql
-
-type pgDatabase struct {
+type postgresql struct {
 	pool *pgxpool.Pool
 }
 
 // NewPostgresql wraps a pgxpool.Pool into the Postgresql interface
 func NewPostgresql(pool *pgxpool.Pool) Postgresql {
-	return &pgDatabase{pool: pool}
+	return &postgresql{pool: pool}
 }
 
-// NewDatabase is an alias for NewPostgresql
-func NewDatabase(pool *pgxpool.Pool) Postgresql {
-	return NewPostgresql(pool)
-}
-
-func (d *pgDatabase) GetDB() *pgxpool.Pool {
+func (d *postgresql) GetDB() *pgxpool.Pool {
 	return d.pool
 }
 
-func (d *pgDatabase) Begin(ctx context.Context) (pgx.Tx, error) {
+func (d *postgresql) Begin(ctx context.Context) (pgx.Tx, error) {
 	if d.pool == nil {
 		return nil, errors.New("database pool is not initialized")
 	}
 	return d.pool.Begin(ctx)
 }
 
-func (d *pgDatabase) Commit(ctx context.Context, tx pgx.Tx) error {
+func (d *postgresql) Commit(ctx context.Context, tx pgx.Tx) error {
 	if tx == nil {
 		return errors.New("transaction is nil")
 	}
 	return tx.Commit(ctx)
 }
 
-func (d *pgDatabase) Rollback(ctx context.Context, tx pgx.Tx) error {
+func (d *postgresql) Rollback(ctx context.Context, tx pgx.Tx) error {
 	if tx == nil {
 		return nil
 	}
@@ -68,7 +58,7 @@ func (d *pgDatabase) Rollback(ctx context.Context, tx pgx.Tx) error {
 	return err
 }
 
-func (d *pgDatabase) CommitOrRollback(ctx context.Context, tx pgx.Tx, err *error) {
+func (d *postgresql) CommitOrRollback(ctx context.Context, tx pgx.Tx, err *error) {
 	if tx == nil {
 		return
 	}
@@ -84,7 +74,7 @@ func (d *pgDatabase) CommitOrRollback(ctx context.Context, tx pgx.Tx, err *error
 	}
 }
 
-func (d *pgDatabase) Close() {
+func (d *postgresql) Close() {
 	if d.pool != nil {
 		d.pool.Close()
 	}
