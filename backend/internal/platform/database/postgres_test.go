@@ -101,25 +101,51 @@ func TestDatabase_CommitOrRollback_OnError(t *testing.T) {
 	}
 }
 
-func TestDatabase_CommitOrRollback_OnPanic(t *testing.T) {
+func TestDatabase_CommitOrRollback_RollbackError(t *testing.T) {
 	db := &postgresql{pool: nil}
-	tx := &mockTx{}
+	expectedErr := errors.New("failed to rollback")
+	tx := &mockTx{rbErr: expectedErr}
+	ctx := context.Background()
+
+	err := errors.New("business error")
+	rbErr := db.CommitOrRollback(ctx, tx, &err)
+
+	if !errors.Is(rbErr, expectedErr) {
+		t.Fatalf("expected rollback error %v, got %v", expectedErr, rbErr)
+	}
+	if !tx.rolledBack {
+		t.Errorf("expected transaction to be rolled back")
+	}
+}
+
+func TestDatabase_CommitOrRollback_CommitError(t *testing.T) {
+	db := &postgresql{pool: nil}
+	expectedErr := errors.New("failed to commit")
+	tx := &mockTx{commitErr: expectedErr}
 	ctx := context.Background()
 
 	var err error
-	func() {
-		defer db.CommitOrRollback(ctx, tx, &err)
-		panic("unexpected runtime panic")
-	}()
+	commitErr := db.CommitOrRollback(ctx, tx, &err)
 
-	if err == nil {
-		t.Fatalf("expected err to be populated with recovered panic error")
+	if !errors.Is(commitErr, expectedErr) {
+		t.Fatalf("expected commit error %v, got %v", expectedErr, commitErr)
 	}
-	if !tx.rolledBack {
-		t.Errorf("expected transaction to be rolled back on panic")
+	if !errors.Is(err, expectedErr) {
+		t.Fatalf("expected err pointer to be updated with commit error %v, got %v", expectedErr, err)
 	}
-	if tx.committed {
-		t.Errorf("did not expect transaction to be committed on panic")
+	if !tx.committed {
+		t.Errorf("expected transaction to attempt commit")
+	}
+}
+
+func TestDatabase_CommitOrRollback_NilTx(t *testing.T) {
+	db := &postgresql{pool: nil}
+	ctx := context.Background()
+
+	var err error
+	retErr := db.CommitOrRollback(ctx, nil, &err)
+	if retErr == nil {
+		t.Fatal("expected error when tx is nil, got nil")
 	}
 }
 

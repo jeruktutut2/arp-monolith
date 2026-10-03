@@ -57,25 +57,14 @@ func (d *postgresql) CommitOrRollback(ctx context.Context, tx pgx.Tx, err *error
 	if tx == nil {
 		return errors.New("transaction is nil")
 	}
-	if p := recover(); p != nil {
-		_ = tx.Rollback(ctx)
-		panicErr := fmt.Errorf("panic recovered: %v", p)
-		if err != nil {
-			*err = panicErr
-		}
-		return panicErr
-	}
 	if err != nil && *err != nil {
-		_ = tx.Rollback(ctx)
-		return *err
+		return d.Rollback(ctx, tx)
 	}
-	if commitErr := tx.Commit(ctx); commitErr != nil {
-		if err != nil && *err == nil {
-			*err = commitErr
-		}
-		return commitErr
+	commitErr := d.Commit(ctx, tx)
+	if commitErr != nil && err != nil && *err == nil {
+		*err = commitErr
 	}
-	return nil
+	return commitErr
 }
 
 func (d *postgresql) Close() {
