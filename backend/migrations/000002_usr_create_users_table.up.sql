@@ -4,7 +4,7 @@
 CREATE TABLE IF NOT EXISTS usr_users (
     id BIGINT PRIMARY KEY,
     company_id BIGINT NOT NULL REFERENCES adm_companies(id) ON DELETE CASCADE,
-    branch_id BIGINT REFERENCES adm_branches(id) ON DELETE SET NULL,
+    branch_id BIGINT REFERENCES adm_company_branches(id) ON DELETE SET NULL,
     email VARCHAR(255) NOT NULL,
     password_hash VARCHAR(255) NOT NULL,
     name VARCHAR(255) NOT NULL,

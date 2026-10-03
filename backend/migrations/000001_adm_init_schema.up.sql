@@ -13,7 +13,7 @@ CREATE TABLE IF NOT EXISTS adm_companies (
     updated_by BIGINT
 );
 
-CREATE TABLE IF NOT EXISTS adm_branches (
+CREATE TABLE IF NOT EXISTS adm_company_branches (
     id BIGINT PRIMARY KEY,
     company_id BIGINT NOT NULL REFERENCES adm_companies(id) ON DELETE CASCADE,
     code VARCHAR(50) NOT NULL,
@@ -24,7 +24,7 @@ CREATE TABLE IF NOT EXISTS adm_branches (
     created_by BIGINT NOT NULL,
     updated_at BIGINT,
     updated_by BIGINT,
-    CONSTRAINT uq_branch_code_per_company UNIQUE (company_id, code)
+    CONSTRAINT uq_company_branch_code_per_company UNIQUE (company_id, code)
 );
 
-CREATE INDEX IF NOT EXISTS idx_adm_branches_company_id ON adm_branches(company_id);
+CREATE INDEX IF NOT EXISTS idx_adm_company_branches_company_id ON adm_company_branches(company_id);
