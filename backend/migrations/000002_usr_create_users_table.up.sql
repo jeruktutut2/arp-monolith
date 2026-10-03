@@ -2,9 +2,9 @@
 -- Enterprise User Management (usr_users)
 
 CREATE TABLE IF NOT EXISTS usr_users (
-    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    company_id UUID NOT NULL REFERENCES adm_companies(id) ON DELETE CASCADE,
-    branch_id UUID REFERENCES adm_branches(id) ON DELETE SET NULL,
+    id BIGINT PRIMARY KEY,
+    company_id BIGINT NOT NULL REFERENCES adm_companies(id) ON DELETE CASCADE,
+    branch_id BIGINT REFERENCES adm_branches(id) ON DELETE SET NULL,
     email VARCHAR(255) NOT NULL,
     password_hash VARCHAR(255) NOT NULL,
     name VARCHAR(255) NOT NULL,
@@ -13,9 +13,9 @@ CREATE TABLE IF NOT EXISTS usr_users (
     failed_login_attempts INT NOT NULL DEFAULT 0,
     locked_until TIMESTAMPTZ,
     created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    created_by UUID,
+    created_by BIGINT,
     updated_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    updated_by UUID,
+    updated_by BIGINT,
     CONSTRAINT uq_usr_users_email UNIQUE (email)
 );
 

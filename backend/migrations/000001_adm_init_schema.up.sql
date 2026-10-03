@@ -2,7 +2,7 @@
 -- Enterprise Multi-Tenant Core Tables (Companies & Branches)
 
 CREATE TABLE IF NOT EXISTS adm_companies (
-    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    id BIGINT PRIMARY KEY,
     code VARCHAR(50) NOT NULL UNIQUE,
     name VARCHAR(255) NOT NULL,
     currency VARCHAR(3) NOT NULL DEFAULT 'IDR',
@@ -12,8 +12,8 @@ CREATE TABLE IF NOT EXISTS adm_companies (
 );
 
 CREATE TABLE IF NOT EXISTS adm_branches (
-    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    company_id UUID NOT NULL REFERENCES adm_companies(id) ON DELETE CASCADE,
+    id BIGINT PRIMARY KEY,
+    company_id BIGINT NOT NULL REFERENCES adm_companies(id) ON DELETE CASCADE,
     code VARCHAR(50) NOT NULL,
     name VARCHAR(255) NOT NULL,
     address TEXT,
