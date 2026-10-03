@@ -29,8 +29,8 @@ func main() {
 		fmt.Printf("⚠️ Warning: Failed to load config: %v\n", err)
 	}
 
-	// 2. Database Pool via PgBouncer
-	dbPool, err := database.NewPool(
+	// 2. Database via PgBouncer
+	db, err := database.NewPostgresql(
 		cfg.Database.URL,
 		cfg.Database.MaxConns,
 		cfg.Database.MinConns,
@@ -38,9 +38,9 @@ func main() {
 		cfg.Database.MaxConnIdleTime,
 	)
 	if err != nil {
-		fmt.Printf("❌ Failed to initialize database pool: %v\n", err)
+		fmt.Printf("❌ Failed to initialize database: %v\n", err)
 	} else {
-		defer dbPool.Close()
+		defer db.Close()
 		fmt.Println("✅ PgBouncer connection pool initialized (:6432)")
 	}
 
@@ -58,10 +58,10 @@ func main() {
 	e.Use(middleware.CORS("*"))
 
 	// 5. Wire Health Check Module
-	health.RegisterModule(e, dbPool)
+	health.RegisterModule(e, db.GetDB())
 
 	// 6. Wire Business Modules (admin: 21_ADM, user: 19_USR, audit: 25_AUD)
-	system.RegisterModule(e, dbPool, cfg)
+	system.RegisterModule(e, db.GetDB(), cfg)
 
 	// 7. Graceful Server Start via Echo v5 StartConfig
 	fmt.Printf("🌐 Server listening on http://localhost:%s\n", cfg.Server.Port)

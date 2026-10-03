@@ -24,11 +24,6 @@ type postgresql struct {
 	pool *pgxpool.Pool
 }
 
-// NewPostgresql wraps a pgxpool.Pool into the Postgresql interface
-func NewPostgresql(pool *pgxpool.Pool) Postgresql {
-	return &postgresql{pool: pool}
-}
-
 func (d *postgresql) GetDB() *pgxpool.Pool {
 	return d.pool
 }
@@ -80,14 +75,14 @@ func (d *postgresql) Close() {
 	}
 }
 
-// NewPool initializes a pgxpool optimized for PgBouncer transaction pooling
-func NewPool(
+// NewPostgresql initializes a pgxpool optimized for PgBouncer and returns the Postgresql interface
+func NewPostgresql(
 	url string,
 	maxConns int32,
 	minConns int32,
 	maxConnLifetime time.Duration,
 	maxConnIdleTime time.Duration,
-) (*pgxpool.Pool, error) {
+) (Postgresql, error) {
 	poolConfig, err := pgxpool.ParseConfig(url)
 	if err != nil {
 		return nil, fmt.Errorf("failed to parse pg connection url: %w", err)
@@ -135,5 +130,5 @@ func NewPool(
 		fmt.Printf("⚠️ Warning: PostgreSQL/PgBouncer not immediately reachable: %v\n", err)
 	}
 
-	return pool, nil
+	return &postgresql{pool: pool}, nil
 }

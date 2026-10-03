@@ -1,11 +1,9 @@
-package database_test
+package database
 
 import (
 	"context"
 	"errors"
 	"testing"
-
-	"erp_monolith/backend/internal/platform/database"
 
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgconn"
@@ -66,7 +64,7 @@ func (m *mockTx) Conn() *pgx.Conn {
 }
 
 func TestDatabase_CommitOrRollback_Success(t *testing.T) {
-	db := database.NewPostgresql(nil)
+	db := &postgresql{pool: nil}
 	tx := &mockTx{}
 	ctx := context.Background()
 
@@ -85,7 +83,7 @@ func TestDatabase_CommitOrRollback_Success(t *testing.T) {
 }
 
 func TestDatabase_CommitOrRollback_OnError(t *testing.T) {
-	db := database.NewPostgresql(nil)
+	db := &postgresql{pool: nil}
 	tx := &mockTx{}
 	ctx := context.Background()
 
@@ -104,7 +102,7 @@ func TestDatabase_CommitOrRollback_OnError(t *testing.T) {
 }
 
 func TestDatabase_CommitOrRollback_OnPanic(t *testing.T) {
-	db := database.NewPostgresql(nil)
+	db := &postgresql{pool: nil}
 	tx := &mockTx{}
 	ctx := context.Background()
 
@@ -129,7 +127,7 @@ func TestDatabase_CommitOrRollback_OnPanic(t *testing.T) {
 }
 
 func TestDatabase_GetDB_And_Close(t *testing.T) {
-	db := database.NewPostgresql(nil)
+	db := &postgresql{pool: nil}
 	if db.GetDB() != nil {
 		t.Errorf("expected nil pool for unit test")
 	}
