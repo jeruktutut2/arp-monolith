@@ -107,23 +107,20 @@ func TestDatabase_CommitOrRollback_OnPanic(t *testing.T) {
 	ctx := context.Background()
 
 	var err error
-	defer func() {
-		p := recover()
-		if p == nil {
-			t.Fatalf("expected panic to be propagated")
-		}
-		if !tx.rolledBack {
-			t.Errorf("expected transaction to be rolled back on panic")
-		}
-		if tx.committed {
-			t.Errorf("did not expect transaction to be committed on panic")
-		}
-	}()
-
 	func() {
 		defer db.CommitOrRollback(ctx, tx, &err)
 		panic("unexpected runtime panic")
 	}()
+
+	if err == nil {
+		t.Fatalf("expected err to be populated with recovered panic error")
+	}
+	if !tx.rolledBack {
+		t.Errorf("expected transaction to be rolled back on panic")
+	}
+	if tx.committed {
+		t.Errorf("did not expect transaction to be committed on panic")
+	}
 }
 
 func TestDatabase_GetDB_And_Close(t *testing.T) {

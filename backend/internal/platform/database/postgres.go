@@ -16,7 +16,7 @@ type Postgresql interface {
 	Begin(ctx context.Context) (pgx.Tx, error)
 	Commit(ctx context.Context, tx pgx.Tx) error
 	Rollback(ctx context.Context, tx pgx.Tx) error
-	CommitOrRollback(ctx context.Context, tx pgx.Tx, err *error)
+	CommitOrRollback(ctx context.Context, tx pgx.Tx, err *error) error
 	Close()
 }
 
@@ -53,20 +53,29 @@ func (d *postgresql) Rollback(ctx context.Context, tx pgx.Tx) error {
 	return err
 }
 
-func (d *postgresql) CommitOrRollback(ctx context.Context, tx pgx.Tx, err *error) {
+func (d *postgresql) CommitOrRollback(ctx context.Context, tx pgx.Tx, err *error) error {
 	if tx == nil {
-		return
+		return errors.New("transaction is nil")
 	}
 	if p := recover(); p != nil {
 		_ = tx.Rollback(ctx)
-		panic(p)
-	} else if err != nil && *err != nil {
+		panicErr := fmt.Errorf("panic recovered: %v", p)
+		if err != nil {
+			*err = panicErr
+		}
+		return panicErr
+	}
+	if err != nil && *err != nil {
 		_ = tx.Rollback(ctx)
-	} else {
-		if commitErr := tx.Commit(ctx); commitErr != nil && err != nil && *err == nil {
+		return *err
+	}
+	if commitErr := tx.Commit(ctx); commitErr != nil {
+		if err != nil && *err == nil {
 			*err = commitErr
 		}
+		return commitErr
 	}
+	return nil
 }
 
 func (d *postgresql) Close() {
