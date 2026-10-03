@@ -2,12 +2,86 @@ package database
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"time"
 
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
+
+// Database defines the interface for database access, transaction lifecycle, and connection cleanup
+type Database interface {
+	GetDB() *pgxpool.Pool
+	Begin(ctx context.Context) (pgx.Tx, error)
+	Commit(ctx context.Context, tx pgx.Tx) error
+	Rollback(ctx context.Context, tx pgx.Tx) error
+	CommitOrRollback(ctx context.Context, tx pgx.Tx, err *error)
+	Close()
+}
+
+// DB is an alias for Database
+type DB = Database
+
+type pgDatabase struct {
+	pool *pgxpool.Pool
+}
+
+// NewDatabase wraps a pgxpool.Pool into the Database interface
+func NewDatabase(pool *pgxpool.Pool) Database {
+	return &pgDatabase{pool: pool}
+}
+
+func (d *pgDatabase) GetDB() *pgxpool.Pool {
+	return d.pool
+}
+
+func (d *pgDatabase) Begin(ctx context.Context) (pgx.Tx, error) {
+	if d.pool == nil {
+		return nil, errors.New("database pool is not initialized")
+	}
+	return d.pool.Begin(ctx)
+}
+
+func (d *pgDatabase) Commit(ctx context.Context, tx pgx.Tx) error {
+	if tx == nil {
+		return errors.New("transaction is nil")
+	}
+	return tx.Commit(ctx)
+}
+
+func (d *pgDatabase) Rollback(ctx context.Context, tx pgx.Tx) error {
+	if tx == nil {
+		return nil
+	}
+	err := tx.Rollback(ctx)
+	if errors.Is(err, pgx.ErrTxClosed) {
+		return nil
+	}
+	return err
+}
+
+func (d *pgDatabase) CommitOrRollback(ctx context.Context, tx pgx.Tx, err *error) {
+	if tx == nil {
+		return
+	}
+	if p := recover(); p != nil {
+		_ = tx.Rollback(ctx)
+		panic(p)
+	} else if err != nil && *err != nil {
+		_ = tx.Rollback(ctx)
+	} else {
+		if commitErr := tx.Commit(ctx); commitErr != nil && err != nil && *err == nil {
+			*err = commitErr
+		}
+	}
+}
+
+func (d *pgDatabase) Close() {
+	if d.pool != nil {
+		d.pool.Close()
+	}
+}
 
 // NewPool initializes a pgxpool optimized for PgBouncer transaction pooling
 func NewPool(
