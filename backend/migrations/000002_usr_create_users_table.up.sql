@@ -13,7 +13,7 @@ CREATE TABLE IF NOT EXISTS usr_users (
     failed_login_attempts INT NOT NULL DEFAULT 0,
     locked_until BIGINT,
     created_at BIGINT NOT NULL,
-    created_by BIGINT,
+    created_by BIGINT NOT NULL,
     updated_at BIGINT,
     updated_by BIGINT,
     CONSTRAINT uq_usr_users_email UNIQUE (email)

@@ -8,7 +8,7 @@ CREATE TABLE IF NOT EXISTS adm_companies (
     currency VARCHAR(3) NOT NULL DEFAULT 'IDR',
     is_active BOOLEAN NOT NULL DEFAULT TRUE,
     created_at BIGINT NOT NULL,
-    created_by BIGINT,
+    created_by BIGINT NOT NULL,
     updated_at BIGINT,
     updated_by BIGINT
 );
@@ -21,7 +21,7 @@ CREATE TABLE IF NOT EXISTS adm_branches (
     address TEXT,
     is_active BOOLEAN NOT NULL DEFAULT TRUE,
     created_at BIGINT NOT NULL,
-    created_by BIGINT,
+    created_by BIGINT NOT NULL,
     updated_at BIGINT,
     updated_by BIGINT,
     CONSTRAINT uq_branch_code_per_company UNIQUE (company_id, code)
