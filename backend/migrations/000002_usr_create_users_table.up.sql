@@ -11,10 +11,10 @@ CREATE TABLE IF NOT EXISTS usr_users (
     role VARCHAR(50) NOT NULL DEFAULT 'user',
     is_active BOOLEAN NOT NULL DEFAULT TRUE,
     failed_login_attempts INT NOT NULL DEFAULT 0,
-    locked_until TIMESTAMPTZ,
-    created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    locked_until BIGINT,
+    created_at BIGINT NOT NULL,
     created_by BIGINT,
-    updated_at TIMESTAMPTZ,
+    updated_at BIGINT,
     updated_by BIGINT,
     CONSTRAINT uq_usr_users_email UNIQUE (email)
 );

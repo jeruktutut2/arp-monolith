@@ -10,7 +10,9 @@ CREATE TABLE IF NOT EXISTS usr_user_sessions (
     refresh_token_expired_at BIGINT NOT NULL,
     is_revoked BOOLEAN NOT NULL DEFAULT FALSE,
     created_at BIGINT NOT NULL,
-    updated_at BIGINT
+    created_by BIGINT,
+    updated_at BIGINT,
+    updated_by BIGINT
 );
 
 CREATE INDEX IF NOT EXISTS idx_usr_user_sessions_user_id ON usr_user_sessions(user_id);
