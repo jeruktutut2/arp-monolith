@@ -30,16 +30,13 @@ func main() {
 	}
 
 	// 2. Database Pool via PgBouncer
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
-
-	dbPool, err := database.NewPool(ctx, database.Config{
-		URL:             cfg.Database.URL,
-		MaxConns:        cfg.Database.MaxConns,
-		MinConns:        cfg.Database.MinConns,
-		MaxConnLifetime: cfg.Database.MaxConnLifetime,
-		MaxConnIdleTime: cfg.Database.MaxConnIdleTime,
-	})
+	dbPool, err := database.NewPool(
+		cfg.Database.URL,
+		cfg.Database.MaxConns,
+		cfg.Database.MinConns,
+		cfg.Database.MaxConnLifetime,
+		cfg.Database.MaxConnIdleTime,
+	)
 	if err != nil {
 		fmt.Printf("❌ Failed to initialize database pool: %v\n", err)
 	} else {

@@ -9,18 +9,15 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
-// Config represents connection parameters for PostgreSQL via PgBouncer
-type Config struct {
-	URL             string
-	MaxConns        int32
-	MinConns        int32
-	MaxConnLifetime time.Duration
-	MaxConnIdleTime time.Duration
-}
-
 // NewPool initializes a pgxpool optimized for PgBouncer transaction pooling
-func NewPool(ctx context.Context, cfg Config) (*pgxpool.Pool, error) {
-	poolConfig, err := pgxpool.ParseConfig(cfg.URL)
+func NewPool(
+	url string,
+	maxConns int32,
+	minConns int32,
+	maxConnLifetime time.Duration,
+	maxConnIdleTime time.Duration,
+) (*pgxpool.Pool, error) {
+	poolConfig, err := pgxpool.ParseConfig(url)
 	if err != nil {
 		return nil, fmt.Errorf("failed to parse pg connection url: %w", err)
 	}
@@ -29,37 +26,37 @@ func NewPool(ctx context.Context, cfg Config) (*pgxpool.Pool, error) {
 	// PgBouncer in transaction mode does not support session-bound prepared statements.
 	poolConfig.ConnConfig.DefaultQueryExecMode = pgx.QueryExecModeSimpleProtocol
 
-	if cfg.MaxConns > 0 {
-		poolConfig.MaxConns = cfg.MaxConns
+	if maxConns > 0 {
+		poolConfig.MaxConns = maxConns
 	} else {
 		poolConfig.MaxConns = 30
 	}
 
-	if cfg.MinConns > 0 {
-		poolConfig.MinConns = cfg.MinConns
+	if minConns > 0 {
+		poolConfig.MinConns = minConns
 	} else {
 		poolConfig.MinConns = 5
 	}
 
-	if cfg.MaxConnLifetime > 0 {
-		poolConfig.MaxConnLifetime = cfg.MaxConnLifetime
+	if maxConnLifetime > 0 {
+		poolConfig.MaxConnLifetime = maxConnLifetime
 	} else {
 		poolConfig.MaxConnLifetime = time.Hour
 	}
 
-	if cfg.MaxConnIdleTime > 0 {
-		poolConfig.MaxConnIdleTime = cfg.MaxConnIdleTime
+	if maxConnIdleTime > 0 {
+		poolConfig.MaxConnIdleTime = maxConnIdleTime
 	} else {
 		poolConfig.MaxConnIdleTime = 30 * time.Minute
 	}
 
-	pool, err := pgxpool.NewWithConfig(ctx, poolConfig)
+	pool, err := pgxpool.NewWithConfig(context.Background(), poolConfig)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create pgxpool: %w", err)
 	}
 
 	// Ping with timeout
-	pingCtx, cancel := context.WithTimeout(ctx, 5*time.Second)
+	pingCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 
 	if err := pool.Ping(pingCtx); err != nil {
