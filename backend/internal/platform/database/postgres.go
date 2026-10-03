@@ -10,8 +10,8 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
-// Database defines the interface for database access, transaction lifecycle, and connection cleanup
-type Database interface {
+// Postgresql defines the interface for database access, transaction lifecycle, and connection cleanup
+type Postgresql interface {
 	GetDB() *pgxpool.Pool
 	Begin(ctx context.Context) (pgx.Tx, error)
 	Commit(ctx context.Context, tx pgx.Tx) error
@@ -20,16 +20,23 @@ type Database interface {
 	Close()
 }
 
-// DB is an alias for Database
-type DB = Database
+// Aliases for compatibility
+type Postgrrsql = Postgresql
+type Database = Postgresql
+type DB = Postgresql
 
 type pgDatabase struct {
 	pool *pgxpool.Pool
 }
 
-// NewDatabase wraps a pgxpool.Pool into the Database interface
-func NewDatabase(pool *pgxpool.Pool) Database {
+// NewPostgresql wraps a pgxpool.Pool into the Postgresql interface
+func NewPostgresql(pool *pgxpool.Pool) Postgresql {
 	return &pgDatabase{pool: pool}
+}
+
+// NewDatabase is an alias for NewPostgresql
+func NewDatabase(pool *pgxpool.Pool) Postgresql {
+	return NewPostgresql(pool)
 }
 
 func (d *pgDatabase) GetDB() *pgxpool.Pool {
