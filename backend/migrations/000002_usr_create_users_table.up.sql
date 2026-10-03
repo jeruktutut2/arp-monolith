@@ -14,7 +14,7 @@ CREATE TABLE IF NOT EXISTS usr_users (
     locked_until TIMESTAMPTZ,
     created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
     created_by BIGINT,
-    updated_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMPTZ,
     updated_by BIGINT,
     CONSTRAINT uq_usr_users_email UNIQUE (email)
 );
