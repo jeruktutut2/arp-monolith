@@ -23,14 +23,10 @@ type redisClient struct {
 	client *redis.Client
 }
 
-func NewRedis(ctx context.Context, redisURL string, password string) (Redis, error) {
+func NewRedis(ctx context.Context, redisURL string) (Redis, error) {
 	opts, err := redis.ParseURL(redisURL)
 	if err != nil {
 		return nil, fmt.Errorf("parse redis url: %w", err)
-	}
-
-	if password != "" {
-		opts.Password = password
 	}
 
 	client := redis.NewClient(opts)
