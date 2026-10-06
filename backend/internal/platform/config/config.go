@@ -11,6 +11,7 @@ import (
 type Config struct {
 	Server   ServerConfig
 	Database DatabaseConfig
+	Redis    RedisConfig
 	Auth     AuthConfig
 }
 
@@ -40,6 +41,14 @@ type DatabaseConfig struct {
 	MinConns        int32         `env:"DB_MIN_CONNS" envDefault:"10"`
 	MaxConnLifetime time.Duration `env:"DB_MAX_CONN_LIFETIME" envDefault:"1h"`
 	MaxConnIdleTime time.Duration `env:"DB_MAX_CONN_IDLE_TIME" envDefault:"30m"`
+}
+
+// RedisConfig holds Redis in-memory cache and distributed lock configuration
+type RedisConfig struct {
+	URL          string        `env:"REDIS_URL" envDefault:"redis://:erp_redis_secret@localhost:6379/0"`
+	PoolSize     int           `env:"REDIS_POOL_SIZE" envDefault:"20"`
+	MinIdleConns int           `env:"REDIS_MIN_IDLE_CONNS" envDefault:"5"`
+	DialTimeout  time.Duration `env:"REDIS_DIAL_TIMEOUT" envDefault:"5s"`
 }
 
 // Load loads configuration from environment variables using caarlos0/env and godotenv
