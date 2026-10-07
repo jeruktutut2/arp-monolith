@@ -9,7 +9,7 @@ import (
 	"github.com/google/uuid"
 )
 
-type SignIn interface {
+type SignInUseCase interface {
 	SignIn(ctx context.Context, req dto.SignInRequest) (result *SignInResult, accessToken string, accessTokenExpiredAt int64, refreshToken string, refreshTokenExpiredAt int64, err error)
 }
 
