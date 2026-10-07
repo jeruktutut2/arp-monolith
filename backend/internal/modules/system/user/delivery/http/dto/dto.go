@@ -20,6 +20,12 @@ type SignInResponse struct {
 	User      UserResponseData `json:"user"`
 }
 
+// SignInResult carries the authenticated user identity
+type SignInResult struct {
+	ID    string `json:"id"`
+	Email string `json:"email"`
+}
+
 // CreateUserRequest carries payload to register a user
 type CreateUserRequest struct {
 	CompanyID string  `json:"company_id"`
