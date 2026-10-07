@@ -4,8 +4,14 @@ import (
 	"context"
 	"time"
 
+	"erp_monolith/backend/internal/modules/system/user/delivery/http/dto"
+
 	"github.com/google/uuid"
 )
+
+type SignIn interface {
+	SignIn(ctx context.Context, req dto.SignInRequest) (result *SignInResult, accessToken string, accessTokenExpiredAt int64, refreshToken string, refreshTokenExpiredAt int64, err error)
+}
 
 // Inbound Port: Application service interface for user management and authentication
 type UserUseCase interface {
@@ -21,13 +27,19 @@ type SignInCommand struct {
 	Password string
 }
 
-// SignInResult contains the issued token and authenticated user details
+// SignInResult carries the authenticated user identity
 type SignInResult struct {
-	Token     string    `json:"token"`
-	TokenType string    `json:"token_type"`
-	ExpiresAt time.Time `json:"expires_at"`
-	User      *User     `json:"user"`
+	ID    string `json:"id"`
+	Email string `json:"email"`
 }
+
+// Old SignInResult (commented out)
+// type SignInResult struct {
+// 	Token     string    `json:"token"`
+// 	TokenType string    `json:"token_type"`
+// 	ExpiresAt time.Time `json:"expires_at"`
+// 	User      *User     `json:"user"`
+// }
 
 // CreateUserCommand carries user creation parameters
 type CreateUserCommand struct {
