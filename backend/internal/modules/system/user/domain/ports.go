@@ -13,6 +13,10 @@ type SignInUseCase interface {
 	SignIn(ctx context.Context, req dto.SignInRequest) (result *SignInResult, accessToken string, accessTokenExpiredAt int64, refreshToken string, refreshTokenExpiredAt int64, err error)
 }
 
+type UserRepository interface {
+	FindByEmail(ctx context.Context, email string) (*User, error)
+}
+
 // Inbound Port: Application service interface for user management and authentication
 type UserUseCase interface {
 	SignIn(ctx context.Context, cmd SignInCommand) (*SignInResult, error)
