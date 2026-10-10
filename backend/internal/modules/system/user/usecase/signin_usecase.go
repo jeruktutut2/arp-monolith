@@ -17,8 +17,10 @@ type signInUseCase struct {
 	userRepo domain.UserRepository
 }
 
-func NewSignInUseCase() domain.SignInUseCase {
-	return &signInUseCase{}
+func NewSignInUseCase(userRepo domain.UserRepository) domain.SignInUseCase {
+	return &signInUseCase{
+		userRepo: userRepo,
+	}
 }
 
 func (u *signInUseCase) SignIn(ctx context.Context, req dto.SignInRequest, now time.Time) (result *domain.SignInResult, accessToken string, accessTokenExpiredAt int64, refreshToken string, refreshTokenExpiredAt int64, err error) {
