@@ -38,3 +38,22 @@ func (r *userRepository) FindByEmail(ctx context.Context, email string) (*domain
 
 	return &user, nil
 }
+
+func (r *userRepository) ResetFailedLogin(ctx context.Context, userID string, now int64) (int64, error) {
+	query := `
+		UPDATE usr_users
+		SET failed_login_attempts = 0,
+		    locked_until = NULL,
+		    updated_at = $1,
+		    updated_by = $2
+		WHERE id = $3
+	`
+
+	db := database.GetExecutor(ctx, r.db)
+	tag, err := db.Exec(ctx, query, userID, now)
+	if err != nil {
+		return 0, err
+	}
+
+	return tag.RowsAffected(), nil
+}

@@ -15,6 +15,7 @@ type SignInUseCase interface {
 
 type UserRepository interface {
 	FindByEmail(ctx context.Context, email string) (*User, error)
+	ResetFailedLogin(ctx context.Context, userID string, now int64) (int64, error)
 }
 
 // Inbound Port: Application service interface for user management and authentication
