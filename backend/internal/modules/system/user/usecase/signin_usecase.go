@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"time"
 
 	"erp_monolith/backend/internal/modules/system/user/delivery/http/dto"
 	"erp_monolith/backend/internal/modules/system/user/domain"
@@ -20,7 +21,7 @@ func NewSignInUseCase() domain.SignInUseCase {
 	return &signInUseCase{}
 }
 
-func (u *signInUseCase) SignIn(ctx context.Context, req dto.SignInRequest) (result *domain.SignInResult, accessToken string, accessTokenExpiredAt int64, refreshToken string, refreshTokenExpiredAt int64, err error) {
+func (u *signInUseCase) SignIn(ctx context.Context, req dto.SignInRequest, now time.Time) (result *domain.SignInResult, accessToken string, accessTokenExpiredAt int64, refreshToken string, refreshTokenExpiredAt int64, err error) {
 	user, err := u.userRepo.FindByEmail(ctx, req.Email)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
