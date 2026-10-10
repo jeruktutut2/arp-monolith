@@ -33,5 +33,9 @@ func (u *signInUseCase) SignIn(ctx context.Context, req dto.SignInRequest) (resu
 		return nil, "", 0, "", 0, fmt.Errorf("%w: invalid credentials", apperrors.ErrUnauthorized)
 	}
 
+	if !user.IsActive {
+		return nil, "", 0, "", 0, fmt.Errorf("%w: account is disabled", apperrors.ErrForbidden)
+	}
+
 	return nil, "", 0, "", 0, nil
 }
