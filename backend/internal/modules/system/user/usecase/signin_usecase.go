@@ -38,5 +38,9 @@ func (u *signInUseCase) SignIn(ctx context.Context, req dto.SignInRequest, now t
 		return nil, "", 0, "", 0, fmt.Errorf("%w: account is disabled", apperrors.ErrForbidden)
 	}
 
+	if user.LockedUntil != nil && now.UnixMilli() < user.LockedUntil.UnixMilli() {
+		return nil, "", 0, "", 0, fmt.Errorf("%w: account is locked, try again later", apperrors.ErrForbidden)
+	}
+
 	return nil, "", 0, "", 0, nil
 }
