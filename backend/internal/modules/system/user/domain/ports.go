@@ -10,7 +10,7 @@ import (
 )
 
 type SignInUseCase interface {
-	SignIn(ctx context.Context, req dto.SignInRequest) (result *SignInResult, accessToken string, accessTokenExpiredAt int64, refreshToken string, refreshTokenExpiredAt int64, err error)
+	SignIn(ctx context.Context, req dto.SignInRequest, now time.Time) (result *SignInResult, accessToken string, accessTokenExpiredAt int64, refreshToken string, refreshTokenExpiredAt int64, err error)
 }
 
 type UserRepository interface {
