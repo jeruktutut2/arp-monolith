@@ -48,6 +48,12 @@ func (u *signInUseCase) SignIn(ctx context.Context, req dto.SignInRequest, now t
 		if nowMilli < user.LockedUntil.UnixMilli() {
 			return nil, "", 0, "", 0, fmt.Errorf("%w: account is locked, try again later", apperrors.ErrForbidden)
 		}
+
+		txCtx, beginErr := u.txManager.Begin(ctx)
+		if beginErr != nil {
+			return nil, "", 0, "", 0, fmt.Errorf("begin tx: %w", beginErr)
+		}
+		_ = txCtx
 	}
 
 	return nil, "", 0, "", 0, nil
