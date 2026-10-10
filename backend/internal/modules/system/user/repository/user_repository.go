@@ -50,7 +50,7 @@ func (r *userRepository) ResetFailedLogin(ctx context.Context, userID string, no
 	`
 
 	db := database.GetExecutor(ctx, r.db)
-	tag, err := db.Exec(ctx, query, userID, now)
+	tag, err := db.Exec(ctx, query, now, userID, userID)
 	if err != nil {
 		return 0, err
 	}
