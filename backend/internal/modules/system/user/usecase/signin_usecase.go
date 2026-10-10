@@ -45,7 +45,7 @@ func (u *signInUseCase) SignIn(ctx context.Context, req dto.SignInRequest, now t
 
 	if user.LockedUntil != nil {
 		nowMilli := now.UnixMilli()
-		if nowMilli < user.LockedUntil.UnixMilli() {
+		if nowMilli < *user.LockedUntil {
 			return nil, "", 0, "", 0, fmt.Errorf("%w: account is locked, try again later", apperrors.ErrForbidden)
 		}
 
