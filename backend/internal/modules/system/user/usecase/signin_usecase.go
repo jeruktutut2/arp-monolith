@@ -53,7 +53,27 @@ func (u *signInUseCase) SignIn(ctx context.Context, req dto.SignInRequest, now t
 		if beginErr != nil {
 			return nil, "", 0, "", 0, fmt.Errorf("begin tx: %w", beginErr)
 		}
-		_ = txCtx
+
+		uc := u
+		rowsAffected, err := uc.userRepo.ResetFailedLogin(txCtx, user.ID.String(), nowMilli)
+		if err != nil {
+			resetErr := err
+			_ = uc.txManager.CommitOrRollback(txCtx, resetErr)
+			return nil, "", 0, "", 0, fmt.Errorf("reset failed login: %w", err)
+		}
+
+		if rowsAffected != 1 {
+			err = fmt.Errorf("reset failed login: expected 1 row affected, got %d", rowsAffected)
+			_ = uc.txManager.CommitOrRollback(txCtx, err)
+			return nil, "", 0, "", 0, err
+		}
+
+		if commitErr := uc.txManager.CommitOrRollback(txCtx, nil); commitErr != nil {
+			return nil, "", 0, "", 0, fmt.Errorf("commit reset failed login: %w", commitErr)
+		}
+
+		user.FailedLoginAttempts = 0
+		user.LockedUntil = nil
 	}
 
 	return nil, "", 0, "", 0, nil
