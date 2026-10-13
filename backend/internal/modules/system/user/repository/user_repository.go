@@ -57,3 +57,19 @@ func (r *userRepository) ResetFailedLogin(ctx context.Context, userID string, no
 
 	return tag.RowsAffected(), nil
 }
+
+func (r *userRepository) UpdateFailedLogin(ctx context.Context, id string, count int, lockedUntil *int64, now int64) (int64, error) {
+	query := `
+		UPDATE usr_users
+		SET failed_login_attempts = $2, locked_until = $3, updated_at = $4
+		WHERE id = $1
+	`
+
+	db := database.GetExecutor(ctx, r.db)
+	tag, err := db.Exec(ctx, query, id, count, lockedUntil, now)
+	if err != nil {
+		return 0, err
+	}
+
+	return tag.RowsAffected(), nil
+}
