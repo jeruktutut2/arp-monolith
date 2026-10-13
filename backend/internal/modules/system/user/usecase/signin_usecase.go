@@ -95,8 +95,25 @@ func (u *signInUseCase) SignIn(ctx context.Context, req dto.SignInRequest, now t
 		if err != nil {
 			return nil, "", 0, "", 0, fmt.Errorf("begin tx: %w", err)
 		}
-		_ = txCtx
-		_ = lockedUntil
+
+		uc := u
+		rowsAffected, err := uc.userRepo.UpdateFailedLogin(txCtx, user.ID.String(), newCount, lockedUntil, nowMilli)
+		if err != nil {
+			_ = uc.txManager.CommitOrRollback(txCtx, err)
+			return nil, "", 0, "", 0, fmt.Errorf("update failed login: %w", err)
+		}
+
+		if rowsAffected != 1 {
+			err = fmt.Errorf("update failed login: expected 1 row affected, got %d", rowsAffected)
+			_ = uc.txManager.CommitOrRollback(txCtx, err)
+			return nil, "", 0, "", 0, err
+		}
+
+		if commitErr := uc.txManager.CommitOrRollback(txCtx, nil); commitErr != nil {
+			return nil, "", 0, "", 0, fmt.Errorf("commit update failed login: %w", commitErr)
+		}
+
+		return nil, "", 0, "", 0, fmt.Errorf("%w: invalid credentials", apperrors.ErrUnauthorized)
 	}
 
 	return nil, "", 0, "", 0, nil
