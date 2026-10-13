@@ -12,6 +12,12 @@ import (
 	"erp_monolith/backend/internal/shared/apperrors"
 
 	"github.com/jackc/pgx/v5"
+	"golang.org/x/crypto/bcrypt"
+)
+
+const (
+	maxFailedAttempts = 5
+	lockDuration      = 30 * time.Minute
 )
 
 type signInUseCase struct {
@@ -74,6 +80,23 @@ func (u *signInUseCase) SignIn(ctx context.Context, req dto.SignInRequest, now t
 
 		user.FailedLoginAttempts = 0
 		user.LockedUntil = nil
+	}
+
+	if err := bcrypt.CompareHashAndPassword([]byte(user.PasswordHash), []byte(req.Password)); err != nil {
+		newCount := user.FailedLoginAttempts + 1
+		nowMilli := now.UnixMilli()
+		var lockedUntil *int64
+		if newCount >= maxFailedAttempts {
+			lockTime := nowMilli + lockDuration.Milliseconds()
+			lockedUntil = &lockTime
+		}
+
+		txCtx, err := u.txManager.Begin(ctx)
+		if err != nil {
+			return nil, "", 0, "", 0, fmt.Errorf("begin tx: %w", err)
+		}
+		_ = txCtx
+		_ = lockedUntil
 	}
 
 	return nil, "", 0, "", 0, nil
