@@ -68,21 +68,20 @@ func (u *signInUseCase) SignIn(ctx context.Context, req dto.SignInRequest, now t
 			return nil, "", 0, "", 0, fmt.Errorf("begin tx: %w", beginErr)
 		}
 
-		uc := u
-		rowsAffected, err := uc.userRepo.ResetFailedLogin(txCtx, user.ID.String(), nowMilli)
+		rowsAffected, err := u.userRepo.ResetFailedLogin(txCtx, user.ID.String(), nowMilli)
 		if err != nil {
 			resetErr := err
-			_ = uc.txManager.CommitOrRollback(txCtx, resetErr)
+			_ = u.txManager.CommitOrRollback(txCtx, resetErr)
 			return nil, "", 0, "", 0, fmt.Errorf("reset failed login: %w", err)
 		}
 
 		if rowsAffected != 1 {
 			err = fmt.Errorf("reset failed login: expected 1 row affected, got %d", rowsAffected)
-			_ = uc.txManager.CommitOrRollback(txCtx, err)
+			_ = u.txManager.CommitOrRollback(txCtx, err)
 			return nil, "", 0, "", 0, err
 		}
 
-		if commitErr := uc.txManager.CommitOrRollback(txCtx, nil); commitErr != nil {
+		if commitErr := u.txManager.CommitOrRollback(txCtx, nil); commitErr != nil {
 			return nil, "", 0, "", 0, fmt.Errorf("commit reset failed login: %w", commitErr)
 		}
 
@@ -103,20 +102,19 @@ func (u *signInUseCase) SignIn(ctx context.Context, req dto.SignInRequest, now t
 			return nil, "", 0, "", 0, fmt.Errorf("begin tx: %w", err)
 		}
 
-		uc := u
-		rowsAffected, err := uc.userRepo.UpdateFailedLogin(txCtx, user.ID.String(), newCount, lockedUntil, nowMilli)
+		rowsAffected, err := u.userRepo.UpdateFailedLogin(txCtx, user.ID.String(), newCount, lockedUntil, nowMilli)
 		if err != nil {
-			_ = uc.txManager.CommitOrRollback(txCtx, err)
+			_ = u.txManager.CommitOrRollback(txCtx, err)
 			return nil, "", 0, "", 0, fmt.Errorf("update failed login: %w", err)
 		}
 
 		if rowsAffected != 1 {
 			err = fmt.Errorf("update failed login: expected 1 row affected, got %d", rowsAffected)
-			_ = uc.txManager.CommitOrRollback(txCtx, err)
+			_ = u.txManager.CommitOrRollback(txCtx, err)
 			return nil, "", 0, "", 0, err
 		}
 
-		if commitErr := uc.txManager.CommitOrRollback(txCtx, nil); commitErr != nil {
+		if commitErr := u.txManager.CommitOrRollback(txCtx, nil); commitErr != nil {
 			return nil, "", 0, "", 0, fmt.Errorf("commit update failed login: %w", commitErr)
 		}
 
