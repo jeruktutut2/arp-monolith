@@ -11,11 +11,11 @@ import (
 
 // User represents an identity within the multi-tenant ERP system
 type User struct {
-	ID                  uuid.UUID  `json:"id"`
-	CompanyID           uuid.UUID  `json:"company_id"`
-	BranchID            *uuid.UUID `json:"branch_id,omitempty"`
+	ID                  int64      `json:"id"`
+	CompanyID           int64      `json:"company_id"`
+	BranchID            int64      `json:"branch_id,omitempty"`
 	Email               string     `json:"email"`
-	PasswordHash        string     `json:"-"`
+	Password            string     `json:"-"`
 	Name                string     `json:"name"`
 	Role                string     `json:"role"`
 	IsActive            bool       `json:"is_active"`
@@ -37,16 +37,16 @@ func (u *User) SetPassword(password string) error {
 	if err != nil {
 		return err
 	}
-	u.PasswordHash = string(hash)
+	u.Password = string(hash)
 	return nil
 }
 
 // ValidatePassword checks if raw password matches the stored bcrypt hash
 func (u *User) ValidatePassword(password string) bool {
-	if u.PasswordHash == "" {
+	if u.Password == "" {
 		return false
 	}
-	err := bcrypt.CompareHashAndPassword([]byte(u.PasswordHash), []byte(password))
+	err := bcrypt.CompareHashAndPassword([]byte(u.Password), []byte(password))
 	return err == nil
 }
 
@@ -74,8 +74,8 @@ func (u *User) ResetLoginAttempts() {
 }
 
 type UserSession struct {
-	ID                    string  `db:"id" json:"id"`
-	UserID                string  `db:"user_id" json:"user_id"`
+	ID                    int64   `db:"id" json:"id"`
+	UserID                int64   `db:"user_id" json:"user_id"`
 	AccessToken           string  `db:"access_token" json:"access_token"`
 	AccessTokenExpiredAt  int64   `db:"access_token_expired_at" json:"access_token_expired_at"`
 	RefreshToken          string  `db:"refresh_token" json:"refresh_token"`

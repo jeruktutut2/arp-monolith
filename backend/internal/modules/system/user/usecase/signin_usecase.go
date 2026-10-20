@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"strconv"
 	"time"
 
 	"erp_monolith/backend/internal/modules/system/user/delivery/http/dto"
@@ -71,7 +72,7 @@ func (u *signInUseCase) SignIn(ctx context.Context, req dto.SignInRequest, now t
 			return nil, "", 0, "", 0, fmt.Errorf("begin tx: %w", beginErr)
 		}
 
-		rowsAffected, err := u.userRepo.ResetFailedLogin(txCtx, user.ID.String(), nowMilli)
+		rowsAffected, err := u.userRepo.ResetFailedLogin(txCtx, strconv.FormatInt(user.ID, 10), nowMilli)
 		if err != nil {
 			resetErr := err
 			_ = u.txManager.CommitOrRollback(txCtx, resetErr)
@@ -92,7 +93,7 @@ func (u *signInUseCase) SignIn(ctx context.Context, req dto.SignInRequest, now t
 		user.LockedUntil = nil
 	}
 
-	if err := bcrypt.CompareHashAndPassword([]byte(user.PasswordHash), []byte(req.Password)); err != nil {
+	if err := bcrypt.CompareHashAndPassword([]byte(user.Password), []byte(req.Password)); err != nil {
 		newCount := user.FailedLoginAttempts + 1
 		var lockedUntil *int64
 		if newCount >= maxFailedAttempts {
@@ -105,7 +106,7 @@ func (u *signInUseCase) SignIn(ctx context.Context, req dto.SignInRequest, now t
 			return nil, "", 0, "", 0, fmt.Errorf("begin tx: %w", err)
 		}
 
-		rowsAffected, err := u.userRepo.UpdateFailedLogin(txCtx, user.ID.String(), newCount, lockedUntil, nowMilli)
+		rowsAffected, err := u.userRepo.UpdateFailedLogin(txCtx, strconv.FormatInt(user.ID, 10), newCount, lockedUntil, nowMilli)
 		if err != nil {
 			_ = u.txManager.CommitOrRollback(txCtx, err)
 			return nil, "", 0, "", 0, fmt.Errorf("update failed login: %w", err)
@@ -124,9 +125,14 @@ func (u *signInUseCase) SignIn(ctx context.Context, req dto.SignInRequest, now t
 		return nil, "", 0, "", 0, fmt.Errorf("%w: invalid credentials", apperrors.ErrUnauthorized)
 	}
 
-	userSessionID, err := u.sonyflake.GenerateID()
+	userSessionIDStr, err := u.sonyflake.GenerateID()
 	if err != nil {
 		return nil, "", 0, "", 0, fmt.Errorf("generate session id: %w", err)
+	}
+
+	userSessionID, err := strconv.ParseInt(userSessionIDStr, 10, 64)
+	if err != nil {
+		return nil, "", 0, "", 0, fmt.Errorf("parse session id: %w", err)
 	}
 
 	accessToken = u.uuid.GenerateAccessToken()
@@ -136,14 +142,14 @@ func (u *signInUseCase) SignIn(ctx context.Context, req dto.SignInRequest, now t
 
 	userSession := &domain.UserSession{
 		ID:                    userSessionID,
-		UserID:                user.ID.String(),
+		UserID:                user.ID,
 		AccessToken:           accessToken,
 		AccessTokenExpiredAt:  accessTokenExpiredAt,
 		RefreshToken:          refreshToken,
 		RefreshTokenExpiredAt: refreshTokenExpiredAt,
 		IsRevoked:             false,
 		CreatedAt:             nowMilli,
-		CreatedBy:             user.ID.String(),
+		CreatedBy:             strconv.FormatInt(user.ID, 10),
 		UpdatedAt:             nil,
 		UpdatedBy:             nil,
 	}
