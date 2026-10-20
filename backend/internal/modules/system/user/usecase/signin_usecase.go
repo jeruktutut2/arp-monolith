@@ -123,5 +123,11 @@ func (u *signInUseCase) SignIn(ctx context.Context, req dto.SignInRequest, now t
 		return nil, "", 0, "", 0, fmt.Errorf("%w: invalid credentials", apperrors.ErrUnauthorized)
 	}
 
-	return nil, "", 0, "", 0, nil
+	nowMilli := now.UnixMilli()
+	accessToken = u.uuid.GenerateAccessToken()
+	accessTokenExpiredAt = nowMilli + u.accessTokenDuration
+	refreshToken = u.uuid.GenerateRefreshToken()
+	refreshTokenExpiredAt = nowMilli + u.refreshTokenDuration
+
+	return nil, accessToken, accessTokenExpiredAt, refreshToken, refreshTokenExpiredAt, nil
 }
