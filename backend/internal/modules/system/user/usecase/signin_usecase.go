@@ -128,12 +128,26 @@ func (u *signInUseCase) SignIn(ctx context.Context, req dto.SignInRequest, now t
 	if err != nil {
 		return nil, "", 0, "", 0, fmt.Errorf("generate session id: %w", err)
 	}
-	_ = userSessionID
 
 	accessToken = u.uuid.GenerateAccessToken()
 	accessTokenExpiredAt = nowMilli + u.accessTokenDuration
 	refreshToken = u.uuid.GenerateRefreshToken()
 	refreshTokenExpiredAt = nowMilli + u.refreshTokenDuration
+
+	userSession := &domain.UserSession{
+		ID:                    userSessionID,
+		UserID:                user.ID.String(),
+		AccessToken:           accessToken,
+		AccessTokenExpiredAt:  accessTokenExpiredAt,
+		RefreshToken:          refreshToken,
+		RefreshTokenExpiredAt: refreshTokenExpiredAt,
+		IsRevoked:             false,
+		CreatedAt:             nowMilli,
+		CreatedBy:             user.ID.String(),
+		UpdatedAt:             nil,
+		UpdatedBy:             nil,
+	}
+	_ = userSession
 
 	return nil, accessToken, accessTokenExpiredAt, refreshToken, refreshTokenExpiredAt, nil
 }
