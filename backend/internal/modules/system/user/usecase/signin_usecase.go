@@ -9,6 +9,7 @@ import (
 	"erp_monolith/backend/internal/modules/system/user/delivery/http/dto"
 	"erp_monolith/backend/internal/modules/system/user/domain"
 	"erp_monolith/backend/internal/platform/database"
+	"erp_monolith/backend/internal/platform/uuid"
 	"erp_monolith/backend/internal/shared/apperrors"
 
 	"github.com/jackc/pgx/v5"
@@ -23,12 +24,14 @@ const (
 type signInUseCase struct {
 	userRepo  domain.UserRepository
 	txManager database.TxManager
+	uuid      uuid.Uuid
 }
 
-func NewSignInUseCase(userRepo domain.UserRepository, txManager database.TxManager) domain.SignInUseCase {
+func NewSignInUseCase(userRepo domain.UserRepository, txManager database.TxManager, uuid uuid.Uuid) domain.SignInUseCase {
 	return &signInUseCase{
 		userRepo:  userRepo,
 		txManager: txManager,
+		uuid:      uuid,
 	}
 }
 
