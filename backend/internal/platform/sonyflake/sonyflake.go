@@ -2,13 +2,12 @@ package sonyflake
 
 import (
 	"fmt"
-	"strconv"
 
 	sf "github.com/sony/sonyflake"
 )
 
 type Sonyflake interface {
-	GenerateID() (string, error)
+	GenerateID() (int64, error)
 }
 
 type sonyflakeImpl struct {
@@ -23,10 +22,10 @@ func New() (Sonyflake, error) {
 	return &sonyflakeImpl{flake: flake}, nil
 }
 
-func (s *sonyflakeImpl) GenerateID() (string, error) {
+func (s *sonyflakeImpl) GenerateID() (int64, error) {
 	id, err := s.flake.NextID()
 	if err != nil {
-		return "", fmt.Errorf("generate sonyflake id: %w", err)
+		return 0, fmt.Errorf("generate sonyflake id: %w", err)
 	}
-	return strconv.FormatUint(id, 10), nil
+	return int64(id), nil
 }

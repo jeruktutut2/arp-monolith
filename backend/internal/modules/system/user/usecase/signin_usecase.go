@@ -125,14 +125,9 @@ func (u *signInUseCase) SignIn(ctx context.Context, req dto.SignInRequest, now t
 		return nil, "", 0, "", 0, fmt.Errorf("%w: invalid credentials", apperrors.ErrUnauthorized)
 	}
 
-	userSessionIDStr, err := u.sonyflake.GenerateID()
+	userSessionID, err := u.sonyflake.GenerateID()
 	if err != nil {
 		return nil, "", 0, "", 0, fmt.Errorf("generate session id: %w", err)
-	}
-
-	userSessionID, err := strconv.ParseInt(userSessionIDStr, 10, 64)
-	if err != nil {
-		return nil, "", 0, "", 0, fmt.Errorf("parse session id: %w", err)
 	}
 
 	accessToken = u.uuid.GenerateAccessToken()
