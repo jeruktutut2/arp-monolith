@@ -22,16 +22,20 @@ const (
 )
 
 type signInUseCase struct {
-	userRepo  domain.UserRepository
-	txManager database.TxManager
-	uuid      uuid.Uuid
+	userRepo             domain.UserRepository
+	txManager            database.TxManager
+	uuid                 uuid.Uuid
+	accessTokenDuration  int64
+	refreshTokenDuration int64
 }
 
-func NewSignInUseCase(userRepo domain.UserRepository, txManager database.TxManager, uuid uuid.Uuid) domain.SignInUseCase {
+func NewSignInUseCase(userRepo domain.UserRepository, txManager database.TxManager, uuid uuid.Uuid, accessTokenDuration int64, refreshTokenDuration int64) domain.SignInUseCase {
 	return &signInUseCase{
-		userRepo:  userRepo,
-		txManager: txManager,
-		uuid:      uuid,
+		userRepo:             userRepo,
+		txManager:            txManager,
+		uuid:                 uuid,
+		accessTokenDuration:  accessTokenDuration,
+		refreshTokenDuration: refreshTokenDuration,
 	}
 }
 
