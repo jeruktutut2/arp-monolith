@@ -72,3 +72,18 @@ func (u *User) ResetLoginAttempts() {
 	u.FailedLoginAttempts = 0
 	u.LockedUntil = nil
 }
+
+type UserSession struct {
+	ID                    string  `db:"id" json:"id"`
+	UserID                string  `db:"user_id" json:"user_id"`
+	AccessToken           string  `db:"access_token" json:"access_token"`
+	AccessTokenExpiredAt  int64   `db:"access_token_expired_at" json:"access_token_expired_at"`
+	RefreshToken          string  `db:"refresh_token" json:"refresh_token"`
+	RefreshTokenExpiredAt int64   `db:"refresh_token_expired_at" json:"refresh_token_expired_at"`
+	IsRevoked             bool    `db:"is_revoked" json:"is_revoked"`
+	CreatedAt             int64   `db:"created_at" json:"created_at"`
+	CreatedBy             string  `db:"created_by" json:"created_by"`
+	UpdatedAt             *int64  `db:"updated_at" json:"updated_at,omitempty"`
+	UpdatedBy             *string `db:"updated_by" json:"updated_by,omitempty"`
+}
+
