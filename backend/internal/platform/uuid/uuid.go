@@ -3,7 +3,7 @@ package uuid
 import googleuuid "github.com/google/uuid"
 
 type Uuid interface {
-	GenerateAuthorizationToken() string
+	GenerateAccessToken() string
 	GenerateRefreshToken() string
 }
 
@@ -13,7 +13,7 @@ func New() Uuid {
 	return &uuidImpl{}
 }
 
-func (u *uuidImpl) GenerateAuthorizationToken() string {
+func (u *uuidImpl) GenerateAccessToken() string {
 	return googleuuid.NewString()
 }
 
