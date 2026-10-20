@@ -9,6 +9,7 @@ import (
 	"erp_monolith/backend/internal/modules/system/user/delivery/http/dto"
 	"erp_monolith/backend/internal/modules/system/user/domain"
 	"erp_monolith/backend/internal/platform/database"
+	"erp_monolith/backend/internal/platform/sonyflake"
 	"erp_monolith/backend/internal/platform/uuid"
 	"erp_monolith/backend/internal/shared/apperrors"
 
@@ -25,15 +26,17 @@ type signInUseCase struct {
 	userRepo             domain.UserRepository
 	txManager            database.TxManager
 	uuid                 uuid.Uuid
+	sonyflake            sonyflake.Sonyflake
 	accessTokenDuration  int64
 	refreshTokenDuration int64
 }
 
-func NewSignInUseCase(userRepo domain.UserRepository, txManager database.TxManager, uuid uuid.Uuid, accessTokenDuration int64, refreshTokenDuration int64) domain.SignInUseCase {
+func NewSignInUseCase(userRepo domain.UserRepository, txManager database.TxManager, uuid uuid.Uuid, sonyflake sonyflake.Sonyflake, accessTokenDuration int64, refreshTokenDuration int64) domain.SignInUseCase {
 	return &signInUseCase{
 		userRepo:             userRepo,
 		txManager:            txManager,
 		uuid:                 uuid,
+		sonyflake:            sonyflake,
 		accessTokenDuration:  accessTokenDuration,
 		refreshTokenDuration: refreshTokenDuration,
 	}
@@ -120,6 +123,12 @@ func (u *signInUseCase) SignIn(ctx context.Context, req dto.SignInRequest, now t
 
 		return nil, "", 0, "", 0, fmt.Errorf("%w: invalid credentials", apperrors.ErrUnauthorized)
 	}
+
+	userSessionID, err := u.sonyflake.GenerateID()
+	if err != nil {
+		return nil, "", 0, "", 0, fmt.Errorf("generate session id: %w", err)
+	}
+	_ = userSessionID
 
 	accessToken = u.uuid.GenerateAccessToken()
 	accessTokenExpiredAt = nowMilli + u.accessTokenDuration
