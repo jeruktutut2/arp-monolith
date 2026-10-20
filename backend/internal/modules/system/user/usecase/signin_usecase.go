@@ -56,8 +56,9 @@ func (u *signInUseCase) SignIn(ctx context.Context, req dto.SignInRequest, now t
 		return nil, "", 0, "", 0, fmt.Errorf("%w: account is disabled", apperrors.ErrForbidden)
 	}
 
+	nowMilli := now.UnixMilli()
+
 	if user.LockedUntil != nil {
-		nowMilli := now.UnixMilli()
 		if nowMilli < *user.LockedUntil {
 			return nil, "", 0, "", 0, fmt.Errorf("%w: account is locked, try again later", apperrors.ErrForbidden)
 		}
@@ -91,7 +92,6 @@ func (u *signInUseCase) SignIn(ctx context.Context, req dto.SignInRequest, now t
 
 	if err := bcrypt.CompareHashAndPassword([]byte(user.PasswordHash), []byte(req.Password)); err != nil {
 		newCount := user.FailedLoginAttempts + 1
-		nowMilli := now.UnixMilli()
 		var lockedUntil *int64
 		if newCount >= maxFailedAttempts {
 			lockTime := nowMilli + lockDuration.Milliseconds()
@@ -123,7 +123,6 @@ func (u *signInUseCase) SignIn(ctx context.Context, req dto.SignInRequest, now t
 		return nil, "", 0, "", 0, fmt.Errorf("%w: invalid credentials", apperrors.ErrUnauthorized)
 	}
 
-	nowMilli := now.UnixMilli()
 	accessToken = u.uuid.GenerateAccessToken()
 	accessTokenExpiredAt = nowMilli + u.accessTokenDuration
 	refreshToken = u.uuid.GenerateRefreshToken()
