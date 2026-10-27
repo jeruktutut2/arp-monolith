@@ -155,7 +155,9 @@ func (u *signInUseCase) SignIn(ctx context.Context, req dto.SignInRequest, now t
 		return nil, "", 0, "", 0, fmt.Errorf("begin tx: %w", err)
 	}
 	defer func() {
-		err = u.txManager.CommitOrRollback(txCtx, err)
+		if commitErr := u.txManager.CommitOrRollback(txCtx, err); commitErr != nil {
+			result, accessToken, accessTokenExpiredAt, refreshToken, refreshTokenExpiredAt, err = nil, "", 0, "", 0, commitErr
+		}
 	}()
 
 	return nil, accessToken, accessTokenExpiredAt, refreshToken, refreshTokenExpiredAt, nil
