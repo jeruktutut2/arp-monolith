@@ -150,5 +150,13 @@ func (u *signInUseCase) SignIn(ctx context.Context, req dto.SignInRequest, now t
 	}
 	_ = userSession
 
+	txCtx, err := u.txManager.Begin(ctx)
+	if err != nil {
+		return nil, "", 0, "", 0, fmt.Errorf("begin tx: %w", err)
+	}
+	defer func() {
+		err = u.txManager.CommitOrRollback(txCtx, err)
+	}()
+
 	return nil, accessToken, accessTokenExpiredAt, refreshToken, refreshTokenExpiredAt, nil
 }
