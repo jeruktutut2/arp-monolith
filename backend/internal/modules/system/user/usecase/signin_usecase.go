@@ -160,5 +160,15 @@ func (u *signInUseCase) SignIn(ctx context.Context, req dto.SignInRequest, now t
 		}
 	}()
 
+	if user.FailedLoginAttempts > 0 {
+		rowsAffected, resetErr := u.userRepo.ResetFailedLogin(txCtx, strconv.FormatInt(user.ID, 10), nowMilli)
+		if resetErr != nil {
+			return nil, "", 0, "", 0, fmt.Errorf("reset failed login: %w", resetErr)
+		}
+		if rowsAffected != 1 {
+			return nil, "", 0, "", 0, fmt.Errorf("reset failed login: expected 1 row affected, got %d", rowsAffected)
+		}
+	}
+
 	return nil, accessToken, accessTokenExpiredAt, refreshToken, refreshTokenExpiredAt, nil
 }
